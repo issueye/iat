@@ -6,20 +6,36 @@ export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
 
+export function CreateAgent(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4);
+}
+
 export function CreateProject(arg1, arg2) {
   return window['go']['main']['App']['CreateProject'](arg1, arg2);
 }
 
-export function CreateSession(arg1, arg2) {
-  return window['go']['main']['App']['CreateSession'](arg1, arg2);
+export function CreateScript(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateScript'](arg1, arg2, arg3);
+}
+
+export function CreateSession(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateSession'](arg1, arg2, arg3);
 }
 
 export function DeleteAIModel(arg1) {
   return window['go']['main']['App']['DeleteAIModel'](arg1);
 }
 
+export function DeleteAgent(arg1) {
+  return window['go']['main']['App']['DeleteAgent'](arg1);
+}
+
 export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
+}
+
+export function DeleteScript(arg1) {
+  return window['go']['main']['App']['DeleteScript'](arg1);
 }
 
 export function DeleteSession(arg1) {
@@ -34,18 +50,42 @@ export function ListAIModels() {
   return window['go']['main']['App']['ListAIModels']();
 }
 
+export function ListAgents() {
+  return window['go']['main']['App']['ListAgents']();
+}
+
 export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
+}
+
+export function ListScripts() {
+  return window['go']['main']['App']['ListScripts']();
 }
 
 export function ListSessions(arg1) {
   return window['go']['main']['App']['ListSessions'](arg1);
 }
 
+export function RunScript(arg1) {
+  return window['go']['main']['App']['RunScript'](arg1);
+}
+
+export function SendMessage(arg1, arg2) {
+  return window['go']['main']['App']['SendMessage'](arg1, arg2);
+}
+
 export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
 
+export function UpdateAgent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5);
+}
+
 export function UpdateProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3);
+}
+
+export function UpdateScript(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateScript'](arg1, arg2, arg3, arg4);
 }

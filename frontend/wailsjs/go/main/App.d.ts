@@ -5,13 +5,21 @@ import {common} from '../models';
 
 export function CreateAIModel(arg1:model.AIModel):Promise<common.Result>;
 
+export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number):Promise<common.Result>;
+
 export function CreateProject(arg1:string,arg2:string):Promise<common.Result>;
 
-export function CreateSession(arg1:number,arg2:string):Promise<common.Result>;
+export function CreateScript(arg1:string,arg2:string,arg3:string):Promise<common.Result>;
+
+export function CreateSession(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
 
 export function DeleteAIModel(arg1:number):Promise<common.Result>;
 
+export function DeleteAgent(arg1:number):Promise<common.Result>;
+
 export function DeleteProject(arg1:number):Promise<common.Result>;
+
+export function DeleteScript(arg1:number):Promise<common.Result>;
 
 export function DeleteSession(arg1:number):Promise<common.Result>;
 
@@ -19,10 +27,22 @@ export function Greet(arg1:string):Promise<string>;
 
 export function ListAIModels():Promise<common.Result>;
 
+export function ListAgents():Promise<common.Result>;
+
 export function ListProjects():Promise<common.Result>;
+
+export function ListScripts():Promise<common.Result>;
 
 export function ListSessions(arg1:number):Promise<common.Result>;
 
+export function RunScript(arg1:number):Promise<common.Result>;
+
+export function SendMessage(arg1:number,arg2:string):Promise<common.Result>;
+
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
 
+export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:number):Promise<common.Result>;
+
 export function UpdateProject(arg1:number,arg2:string,arg3:string):Promise<common.Result>;
+
+export function UpdateScript(arg1:number,arg2:string,arg3:string,arg4:string):Promise<common.Result>;

@@ -7,17 +7,17 @@ import (
 
 type SSEHandler struct {
 	clients map[chan string]bool
-	new     chan chan string
-	closed  chan chan string
-	total   chan string
+	New     chan chan string
+	Closed  chan chan string
+	Total   chan string
 }
 
 func NewSSEHandler() *SSEHandler {
 	handler := &SSEHandler{
 		clients: make(map[chan string]bool),
-		new:     make(chan chan string),
-		closed:  make(chan chan string),
-		total:   make(chan string),
+		New:     make(chan chan string),
+		Closed:  make(chan chan string),
+		Total:   make(chan string),
 	}
 
 	go handler.listen()
@@ -28,12 +28,12 @@ func NewSSEHandler() *SSEHandler {
 func (h *SSEHandler) listen() {
 	for {
 		select {
-		case s := <-h.new:
+		case s := <-h.New:
 			h.clients[s] = true
-		case s := <-h.closed:
+		case s := <-h.Closed:
 			delete(h.clients, s)
 			close(s)
-		case event := <-h.total:
+		case event := <-h.Total:
 			for client := range h.clients {
 				client <- event
 			}
@@ -48,10 +48,10 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	client := make(chan string)
-	h.new <- client
+	h.New <- client
 
 	defer func() {
-		h.closed <- client
+		h.Closed <- client
 	}()
 
 	flusher, ok := w.(http.Flusher)
@@ -74,5 +74,5 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *SSEHandler) Send(msg string) {
-	h.total <- msg
+	h.Total <- msg
 }
