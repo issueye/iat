@@ -175,15 +175,22 @@
 
           <div style="display: flex; align-items: center; margin-bottom: 8px">
             <n-select
+              v-model:value="currentChatMode"
+              :options="modeOptions"
+              size="small"
+              style="width: 120px"
+              placeholder="模式"
+            />
+            <n-select
               v-model:value="currentChatAgentId"
               :options="agentOptions"
               size="small"
-              style="width: 200px"
-              placeholder="使用默认 Agent"
+              style="width: 180px; margin-left: 8px"
+              placeholder="选择 Agent"
               clearable
             />
             <span style="font-size: 12px; color: #999; margin-left: 8px"
-              >(选择此轮对话使用的 Agent)</span
+              >(模式与 Agent 共同决定对话逻辑)</span
             >
             <span style="font-size: 12px; color: #999; margin-left: 12px"
               >累计 Tokens: {{ totalTokenUsage }}</span
@@ -251,8 +258,11 @@
         <n-form-item label="会话名称">
           <n-input v-model:value="newSessionName" placeholder="我的会话" />
         </n-form-item>
+        <n-form-item label="模式">
+          <n-select v-model:value="selectedMode" :options="modeOptions" />
+        </n-form-item>
         <n-form-item label="选择 Agent">
-          <n-select v-model:value="selectedAgentId" :options="agentOptions" />
+          <n-select v-model:value="selectedAgentId" :options="agentOptions" placeholder="默认不选择" clearable />
         </n-form-item>
       </n-form>
       <template #action>
@@ -334,10 +344,18 @@ const sessions = ref([]);
 const agents = ref([]);
 const currentProjectId = ref(null);
 const currentSessionId = ref(null);
+const currentChatMode = ref("chat");
 const currentChatAgentId = ref(null);
 const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
+
+const modeOptions = [
+  { label: "对话 (Chat)", value: "chat" },
+  { label: "代码 (Code)", value: "code" },
+  { label: "工具 (Tool)", value: "tool" },
+];
+
 const totalTokenUsage = computed(() => {
   return messages.value.reduce((sum, m) => {
     const n = Number(m?.tokenUsage || 0);
@@ -348,6 +366,7 @@ const totalTokenUsage = computed(() => {
 // Create Modal State
 const showCreateModal = ref(false);
 const newSessionName = ref("");
+const selectedMode = ref("chat");
 const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
 const toolInvocations = ref([]);
@@ -552,15 +571,9 @@ async function loadAgents() {
         value: a.id,
       }));
 
-      // Default to "Chat" agent if available
-      const chatAgent = agents.value.find(
-        (a) => a.name === "Chat" && a.type === "builtin"
-      );
-      if (chatAgent) {
-        selectedAgentId.value = chatAgent.id;
-      } else if (agents.value.length > 0) {
-        selectedAgentId.value = agents.value[0].id;
-      }
+      // Reset to defaults
+      currentChatAgentId.value = null;
+      selectedAgentId.value = null;
     }
   } catch (e) {
     message.error("加载 Agent 失败");
@@ -596,38 +609,28 @@ async function handleProjectChange(pid) {
 }
 
 async function confirmCreateSession() {
-  if (!newSessionName.value || !selectedAgentId.value) {
-    message.warning("名称和 Agent 为必填项");
+  if (!newSessionName.value) {
+    message.warning("名称为必填项");
     return;
   }
   try {
     const res = await CreateSession(
       currentProjectId.value,
       newSessionName.value,
-      selectedAgentId.value
+      selectedAgentId.value || 0
     );
     if (res.code === 200) {
       showCreateModal.value = false;
       newSessionName.value = "";
-
-      // Reset selected agent to default
-      const chatAgent = agents.value.find(
-        (a) => a.name === "Chat" && a.type === "builtin"
-      );
-      if (chatAgent) {
-        selectedAgentId.value = chatAgent.id;
-      } else if (agents.value.length > 0) {
-        selectedAgentId.value = agents.value[0].id;
-      } else {
-        selectedAgentId.value = null;
-      }
+      selectedMode.value = "chat";
+      selectedAgentId.value = null;
 
       await loadSessions(currentProjectId.value);
     } else {
       message.error(res.msg);
     }
   } catch (e) {
-    message.error("创建失败: " + e);
+    message.error("创建失败");
   }
 }
 
@@ -657,6 +660,7 @@ async function loadHistory(sid) {
 
 function handleSelectSession(sid) {
   currentSessionId.value = sid;
+  currentChatMode.value = "chat"; // Default mode
   currentChatAgentId.value = null; // Reset temp agent selection when switching session
   router.push({ name: "Chat", params: { sessionId: sid } });
   loadHistory(sid);
