@@ -52,37 +52,37 @@ function renderIcon(icon) {
 
 const menuOptions = [
   {
-    label: "Home",
+    label: "首页",
     key: "Home",
     icon: renderIcon(HomeIcon),
     onClick: () => router.push({ name: "Home" }),
   },
   {
-    label: "Projects",
+    label: "项目列表",
     key: "Projects",
     icon: renderIcon(ProjectIcon),
     onClick: () => router.push({ name: "Projects" }),
   },
   {
-    label: "Models",
+    label: "模型管理",
     key: "Models",
     icon: renderIcon(ModelIcon),
     onClick: () => router.push({ name: "Models" }),
   },
   {
-    label: "Scripts",
+    label: "脚本管理",
     key: "Scripts",
     icon: renderIcon(ScriptIcon),
     onClick: () => router.push({ name: "Scripts" }),
   },
   {
-    label: "Agents",
+    label: "智能体管理",
     key: "Agents",
     icon: renderIcon(AgentIcon),
     onClick: () => router.push({ name: "Agents" }),
   },
   {
-    label: "Chat",
+    label: "智能对话",
     key: "Chat",
     icon: renderIcon(ChatIcon),
     onClick: () => router.push({ name: "Chat" }),

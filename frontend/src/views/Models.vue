@@ -1,9 +1,9 @@
 <template>
   <div>
     <n-space justify="space-between" align="center" style="margin-bottom: 16px">
-      <n-h2 style="margin: 0">AI Models</n-h2>
+      <n-h2 style="margin: 0">AI 模型管理</n-h2>
       <n-button type="primary" @click="showCreateModal = true">
-        New Model
+        新建模型
       </n-button>
     </n-space>
 
@@ -15,37 +15,37 @@
     />
 
     <!-- Create/Edit Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? 'Edit Model' : 'New Model'" style="width: 600px">
+    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? '编辑模型' : '新建模型'" style="width: 600px">
       <n-form ref="formRef" :model="formValue" :rules="rules" label-placement="left" label-width="100">
-        <n-form-item label="Name" path="name">
-          <n-input v-model:value="formValue.name" placeholder="Model Name (e.g. gpt-4o)" />
+        <n-form-item label="名称" path="name">
+          <n-input v-model:value="formValue.name" placeholder="模型名称 (如 gpt-4o)" />
         </n-form-item>
-        <n-form-item label="Provider" path="provider">
+        <n-form-item label="提供商" path="provider">
           <n-select v-model:value="formValue.provider" :options="providerOptions" />
         </n-form-item>
-        <n-form-item label="Base URL" path="baseUrl">
+        <n-form-item label="接口地址" path="baseUrl">
           <n-input v-model:value="formValue.baseUrl" placeholder="https://api.openai.com/v1" />
         </n-form-item>
-        <n-form-item label="API Key" path="apiKey">
+        <n-form-item label="API 密钥" path="apiKey">
           <n-input v-model:value="formValue.apiKey" type="password" show-password-on="click" placeholder="sk-..." />
         </n-form-item>
-        <n-form-item label="Config" path="configJson">
+        <n-form-item label="配置" path="configJson">
           <n-input
             v-model:value="formValue.configJson"
             type="textarea"
-            placeholder="JSON Config (Optional)"
+            placeholder="JSON 配置 (可选)"
           />
         </n-form-item>
-        <n-form-item label="Default" path="isDefault">
+        <n-form-item label="默认" path="isDefault">
           <n-switch v-model:value="formValue.isDefault" />
         </n-form-item>
       </n-form>
       <template #action>
         <n-space>
-          <n-button @click="testConnection" :loading="testing">Test Connection</n-button>
-          <n-button @click="closeModal">Cancel</n-button>
+          <n-button @click="testConnection" :loading="testing">测试连接</n-button>
+          <n-button @click="closeModal">取消</n-button>
           <n-button type="primary" :loading="submitting" @click="handleSubmit">
-            {{ isEdit ? 'Update' : 'Create' }}
+            {{ isEdit ? '更新' : '创建' }}
           </n-button>
         </n-space>
       </template>
@@ -85,33 +85,33 @@ const providerOptions = [
 ]
 
 const rules = {
-  name: { required: true, message: 'Required', trigger: 'blur' },
-  provider: { required: true, message: 'Required', trigger: 'blur' },
-  apiKey: { required: true, message: 'Required', trigger: 'blur' }
+  name: { required: true, message: '必填', trigger: 'blur' },
+  provider: { required: true, message: '必填', trigger: 'blur' },
+  apiKey: { required: true, message: '必填', trigger: 'blur' }
 }
 
 const pagination = { pageSize: 10 }
 
 const columns = [
-  { title: 'Name', key: 'name', width: 150 },
-  { title: 'Provider', key: 'provider', width: 100 },
-  { title: 'Base URL', key: 'baseUrl' },
+  { title: '名称', key: 'name', width: 150 },
+  { title: '提供商', key: 'provider', width: 100 },
+  { title: '接口地址', key: 'baseUrl' },
   { 
-    title: 'Default', 
+    title: '默认', 
     key: 'isDefault', 
     width: 80,
     render(row) {
-      return row.isDefault ? h(NTag, { type: 'success' }, { default: () => 'Yes' }) : ''
+      return row.isDefault ? h(NTag, { type: 'success' }, { default: () => '是' }) : ''
     }
   },
   {
-    title: 'Action',
+    title: '操作',
     key: 'actions',
     width: 150,
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, { default: () => 'Delete' })
+          h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, { default: () => '删除' })
         ]
       })
     }
@@ -128,7 +128,7 @@ async function loadModels() {
       message.error(res.msg)
     }
   } catch (e) {
-    message.error('Failed to load models: ' + e)
+    message.error('加载模型失败: ' + e)
   } finally {
     loading.value = false
   }
@@ -136,21 +136,21 @@ async function loadModels() {
 
 function handleDelete(row) {
   dialog.warning({
-    title: 'Confirm Delete',
-    content: `Delete model "${row.name}"?`,
-    positiveText: 'Confirm',
-    negativeText: 'Cancel',
+    title: '确认删除',
+    content: `确认删除模型 "${row.name}"?`,
+    positiveText: '确认',
+    negativeText: '取消',
     onPositiveClick: async () => {
       try {
         const res = await DeleteAIModel(row.id)
         if (res.code === 200) {
-          message.success('Deleted')
+          message.success('已删除')
           loadModels()
         } else {
           message.error(res.msg)
         }
       } catch (e) {
-        message.error('Failed to delete: ' + e)
+        message.error('删除失败: ' + e)
       }
     }
   })
@@ -172,7 +172,7 @@ function closeModal() {
 
 async function handleSubmit() {
   if (!formValue.value.name || !formValue.value.apiKey) {
-    message.warning('Name and API Key are required')
+    message.warning('名称和 API Key 为必填项')
     return
   }
   
@@ -191,14 +191,14 @@ async function handleSubmit() {
     const res = await CreateAIModel(modelData)
     
     if (res.code === 200) {
-      message.success('Created successfully')
+      message.success('创建成功')
       closeModal()
       loadModels()
     } else {
       message.error(res.msg)
     }
   } catch (e) {
-    message.error('Operation failed: ' + e)
+    message.error('操作失败: ' + e)
   } finally {
     submitting.value = false
   }
@@ -210,12 +210,12 @@ async function testConnection() {
      const modelData = { ...formValue.value }
      const res = await TestAIModel(modelData)
      if (res.code === 200) {
-       message.success('Connection Successful!')
+       message.success('连接成功！')
      } else {
-       message.error('Connection Failed: ' + res.msg)
+       message.error('连接失败: ' + res.msg)
      }
   } catch (e) {
-    message.error('Test failed: ' + e)
+    message.error('测试失败: ' + e)
   } finally {
     testing.value = false
   }

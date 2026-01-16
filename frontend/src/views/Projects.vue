@@ -1,9 +1,9 @@
 <template>
   <div>
     <n-space justify="space-between" align="center" style="margin-bottom: 16px">
-      <n-h2 style="margin: 0">Projects</n-h2>
+      <n-h2 style="margin: 0">项目列表</n-h2>
       <n-button type="primary" @click="showCreateModal = true">
-        New Project
+        新建项目
       </n-button>
     </n-space>
 
@@ -15,24 +15,24 @@
     />
 
     <!-- Create/Edit Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? 'Edit Project' : 'New Project'">
+    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? '编辑项目' : '新建项目'">
       <n-form ref="formRef" :model="formValue" :rules="rules">
-        <n-form-item label="Name" path="name">
-          <n-input v-model:value="formValue.name" placeholder="Project Name" />
+        <n-form-item label="名称" path="name">
+          <n-input v-model:value="formValue.name" placeholder="项目名称" />
         </n-form-item>
-        <n-form-item label="Description" path="description">
+        <n-form-item label="描述" path="description">
           <n-input
             v-model:value="formValue.description"
             type="textarea"
-            placeholder="Description"
+            placeholder="描述"
           />
         </n-form-item>
       </n-form>
       <template #action>
         <n-space>
-          <n-button @click="closeModal">Cancel</n-button>
+          <n-button @click="closeModal">取消</n-button>
           <n-button type="primary" :loading="submitting" @click="handleSubmit">
-            {{ isEdit ? 'Update' : 'Create' }}
+            {{ isEdit ? '更新' : '创建' }}
           </n-button>
         </n-space>
       </template>
@@ -63,7 +63,7 @@ const formValue = ref({
 const rules = {
   name: {
     required: true,
-    message: 'Please enter project name',
+    message: '请输入项目名称',
     trigger: 'blur'
   }
 }
@@ -79,16 +79,16 @@ const columns = [
     width: 80
   },
   {
-    title: 'Name',
+    title: '名称',
     key: 'name',
     width: 200
   },
   {
-    title: 'Description',
+    title: '描述',
     key: 'description'
   },
   {
-    title: 'Created At',
+    title: '创建时间',
     key: 'createdAt',
     width: 200,
     render(row) {
@@ -96,7 +96,7 @@ const columns = [
     }
   },
   {
-    title: 'Action',
+    title: '操作',
     key: 'actions',
     width: 150,
     render(row) {
@@ -108,7 +108,7 @@ const columns = [
               size: 'small',
               onClick: () => handleEdit(row)
             },
-            { default: () => 'Edit' }
+            { default: () => '编辑' }
           ),
           h(
             NButton,
@@ -117,7 +117,7 @@ const columns = [
               type: 'error',
               onClick: () => handleDelete(row)
             },
-            { default: () => 'Delete' }
+            { default: () => '删除' }
           )
         ]
       })
@@ -135,7 +135,7 @@ async function loadProjects() {
       message.error(res.msg)
     }
   } catch (e) {
-    message.error('Failed to load projects: ' + e)
+    message.error('加载项目失败: ' + e)
   } finally {
     loading.value = false
   }
@@ -153,21 +153,21 @@ function handleEdit(row) {
 
 function handleDelete(row) {
   dialog.warning({
-    title: 'Confirm Delete',
-    content: `Are you sure to delete project "${row.name}"?`,
-    positiveText: 'Confirm',
-    negativeText: 'Cancel',
+    title: '确认删除',
+    content: `确定要删除项目 "${row.name}" 吗？`,
+    positiveText: '确认',
+    negativeText: '取消',
     onPositiveClick: async () => {
       try {
         const res = await DeleteProject(row.id)
         if (res.code === 200) {
-          message.success('Deleted successfully')
+          message.success('删除成功')
           loadProjects()
         } else {
           message.error(res.msg)
         }
       } catch (e) {
-        message.error('Failed to delete: ' + e)
+        message.error('删除失败: ' + e)
       }
     }
   })
@@ -182,7 +182,7 @@ function closeModal() {
 
 async function handleSubmit() {
   if (!formValue.value.name) {
-    message.warning('Please enter name')
+    message.warning('请输入名称')
     return
   }
   
@@ -196,14 +196,14 @@ async function handleSubmit() {
     }
     
     if (res.code === 200) {
-      message.success(isEdit.value ? 'Updated successfully' : 'Created successfully')
+      message.success(isEdit.value ? '更新成功' : '创建成功')
       closeModal()
       loadProjects()
     } else {
       message.error(res.msg)
     }
   } catch (e) {
-    message.error('Operation failed: ' + e)
+    message.error('操作失败: ' + e)
   } finally {
     submitting.value = false
   }

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <h1>Welcome to iat</h1>
-    <p>Your AI Agent Tool</p>
+    <h1>欢迎使用 iat</h1>
+    <p>你的 AI Agent 工具</p>
   </div>
 </template>

@@ -10,14 +10,20 @@
         <n-select
           v-model:value="currentProjectId"
           filterable
-          placeholder="Select Project"
+          placeholder="选择项目"
           :options="projectOptions"
           @update:value="handleProjectChange"
         />
       </div>
-      
-      <n-button block dashed style="margin-bottom: 12px" @click="showCreateModal = true" :disabled="!currentProjectId">
-        + New Chat
+
+      <n-button
+        block
+        dashed
+        style="margin-bottom: 12px"
+        @click="showCreateModal = true"
+        :disabled="!currentProjectId"
+      >
+        + 新建会话
       </n-button>
 
       <n-scrollbar>
@@ -30,40 +36,66 @@
           >
             <div class="session-item">
               <span class="session-name">{{ session.name }}</span>
-              <n-button size="tiny" text type="error" @click.stop="handleDeleteSession(session.id)">
-                <template #icon><n-icon><TrashOutline /></n-icon></template>
+              <n-button
+                size="tiny"
+                text
+                type="error"
+                @click.stop="handleDeleteSession(session.id)"
+              >
+                <template #icon
+                  ><n-icon><TrashOutline /></n-icon
+                ></template>
               </n-button>
             </div>
           </n-list-item>
         </n-list>
-        <div v-if="sessions.length === 0 && currentProjectId" style="text-align: center; color: #666; margin-top: 20px;">
-          No sessions
+        <div
+          v-if="sessions.length === 0 && currentProjectId"
+          style="text-align: center; color: #666; margin-top: 20px"
+        >
+          暂无会话
         </div>
       </n-scrollbar>
     </n-layout-sider>
 
     <!-- Chat Area -->
-    <n-layout-content content-style="display: flex; flex-direction: column; height: 100%;">
+    <n-layout-content
+      content-style="display: flex; flex-direction: column; height: 100%;"
+    >
       <div v-if="!currentSessionId" class="empty-state">
-        <n-empty description="Select a project and session to start chatting" />
+        <n-empty description="选择一个项目和会话以开始聊天" />
       </div>
-      
+
       <template v-else>
         <!-- Messages Area -->
         <div class="messages-container">
           <n-scrollbar ref="scrollbarRef">
             <div class="message-list">
-              <div v-for="(msg, index) in messages" :key="index" :class="['message-row', msg.role]">
+              <div
+                v-for="(msg, index) in messages"
+                :key="index"
+                :class="['message-row', msg.role]"
+              >
                 <div class="message-avatar">
-                  <n-avatar size="small" :style="{ backgroundColor: msg.role === 'user' ? '#18a058' : '#2080f0' }">
-                    {{ msg.role === 'user' ? 'U' : 'AI' }}
+                  <n-avatar
+                    size="small"
+                    :style="{
+                      backgroundColor:
+                        msg.role === 'user' ? '#18a058' : '#2080f0',
+                    }"
+                  >
+                    {{ msg.role === "user" ? "U" : "AI" }}
                   </n-avatar>
                 </div>
                 <div class="message-content">
                   <div class="message-bubble" v-if="msg.role === 'user'">
                     {{ msg.content }}
                   </div>
-                   <div class="message-bubble markdown-body" v-else v-html="renderMarkdown(msg.content)"></div>
+                  <div
+                    class="message-bubble markdown-body"
+                    v-else
+                    v-html="renderMarkdown(msg.content)"
+                  ></div>
                 </div>
               </div>
             </div>
@@ -76,249 +108,276 @@
             v-model:value="inputText"
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 5 }"
-            placeholder="Type a message..."
+            placeholder="输入消息..."
             @keydown.enter.prevent="handleSend"
           />
-          <n-button type="primary" style="margin-left: 12px" @click="handleSend" :disabled="!inputText.trim()">
-            Send
+          <n-button
+            type="primary"
+            style="margin-left: 12px"
+            @click="handleSend"
+            :disabled="!inputText.trim()"
+          >
+            发送
           </n-button>
         </div>
       </template>
     </n-layout-content>
 
     <!-- Create Session Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" title="New Chat" style="width: 400px">
-        <n-form>
-            <n-form-item label="Session Name">
-                <n-input v-model:value="newSessionName" placeholder="My Chat" />
-            </n-form-item>
-            <n-form-item label="Select Agent">
-                <n-select v-model:value="selectedAgentId" :options="agentOptions" />
-            </n-form-item>
-        </n-form>
-        <template #action>
-            <n-button @click="showCreateModal = false">Cancel</n-button>
-            <n-button type="primary" @click="confirmCreateSession">Create</n-button>
-        </template>
+    <n-modal
+      v-model:show="showCreateModal"
+      preset="dialog"
+      title="新建会话"
+      style="width: 400px"
+    >
+      <n-form>
+        <n-form-item label="会话名称">
+          <n-input v-model:value="newSessionName" placeholder="我的会话" />
+        </n-form-item>
+        <n-form-item label="选择 Agent">
+          <n-select v-model:value="selectedAgentId" :options="agentOptions" />
+        </n-form-item>
+      </n-form>
+      <template #action>
+        <n-button @click="showCreateModal = false">取消</n-button>
+        <n-button type="primary" @click="confirmCreateSession">创建</n-button>
+      </template>
     </n-modal>
   </n-layout>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useMessage, useDialog, NIcon } from 'naive-ui'
-import { TrashOutline } from '@vicons/ionicons5'
-import { ListProjects, ListSessions, CreateSession, DeleteSession, ListAgents, SendMessage } from '../../wailsjs/go/main/App'
-import { renderMarkdown } from '../utils/markdown'
+import { ref, onMounted, watch, onUnmounted, nextTick } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useMessage, useDialog, NIcon } from "naive-ui";
+import { TrashOutline } from "@vicons/ionicons5";
+import {
+  ListProjects,
+  ListSessions,
+  CreateSession,
+  DeleteSession,
+  ListAgents,
+  SendMessage,
+} from "../../wailsjs/go/main/App";
+import { renderMarkdown } from "../utils/markdown";
 
-const route = useRoute()
-const router = useRouter()
-const message = useMessage()
-const dialog = useDialog()
+const route = useRoute();
+const router = useRouter();
+const message = useMessage();
+const dialog = useDialog();
 
 // State
-const projects = ref([])
-const sessions = ref([])
-const agents = ref([])
-const currentProjectId = ref(null)
-const currentSessionId = ref(null)
-const messages = ref([]) 
-const inputText = ref('')
-const scrollbarRef = ref(null)
+const projects = ref([]);
+const sessions = ref([]);
+const agents = ref([]);
+const currentProjectId = ref(null);
+const currentSessionId = ref(null);
+const messages = ref([]);
+const inputText = ref("");
+const scrollbarRef = ref(null);
 
 // Create Modal State
-const showCreateModal = ref(false)
-const newSessionName = ref('')
-const selectedAgentId = ref(null)
+const showCreateModal = ref(false);
+const newSessionName = ref("");
+const selectedAgentId = ref(null);
 
 // SSE
-let eventSource = null
+let eventSource = null;
 
 // Computeds
-const projectOptions = ref([])
-const agentOptions = ref([])
+const projectOptions = ref([]);
+const agentOptions = ref([]);
 
 // Methods
 async function loadProjects() {
   try {
-    const res = await ListProjects()
+    const res = await ListProjects();
     if (res.code === 200) {
-      projects.value = res.data || []
-      projectOptions.value = projects.value.map(p => ({ label: p.name, value: p.id }))
-      
+      projects.value = res.data || [];
+      projectOptions.value = projects.value.map((p) => ({
+        label: p.name,
+        value: p.id,
+      }));
+
       if (!currentProjectId.value && projects.value.length > 0) {
-        currentProjectId.value = projects.value[0].id
-        await loadSessions(currentProjectId.value)
+        currentProjectId.value = projects.value[0].id;
+        await loadSessions(currentProjectId.value);
       }
     }
   } catch (e) {
-    message.error('Failed to load projects')
+    message.error("加载项目失败");
   }
 }
 
 async function loadAgents() {
-    try {
-        const res = await ListAgents()
-        if (res.code === 200) {
-            agents.value = res.data || []
-            agentOptions.value = agents.value.map(a => ({ label: a.name, value: a.id }))
-        }
-    } catch(e) {
-        message.error("Failed to load agents")
+  try {
+    const res = await ListAgents();
+    if (res.code === 200) {
+      agents.value = res.data || [];
+      agentOptions.value = agents.value.map((a) => ({
+        label: a.name,
+        value: a.id,
+      }));
     }
+  } catch (e) {
+    message.error("加载 Agent 失败");
+  }
 }
 
 async function loadSessions(pid) {
   try {
-    const res = await ListSessions(pid)
+    const res = await ListSessions(pid);
     if (res.code === 200) {
-      sessions.value = res.data || []
+      sessions.value = res.data || [];
       if (route.params.sessionId) {
-        const sid = parseInt(route.params.sessionId)
-        const exists = sessions.value.find(s => s.id === sid)
+        const sid = parseInt(route.params.sessionId);
+        const exists = sessions.value.find((s) => s.id === sid);
         if (exists) {
-          currentSessionId.value = sid
+          currentSessionId.value = sid;
         } else {
-          currentSessionId.value = null
+          currentSessionId.value = null;
         }
       }
     }
   } catch (e) {
-    message.error('Failed to load sessions')
+    message.error("加载会话失败");
   }
 }
 
 async function handleProjectChange(pid) {
-  currentProjectId.value = pid
-  currentSessionId.value = null
-  router.push({ name: 'Chat' }) 
-  await loadSessions(pid)
+  currentProjectId.value = pid;
+  currentSessionId.value = null;
+  router.push({ name: "Chat" });
+  await loadSessions(pid);
 }
 
 async function confirmCreateSession() {
-    if (!newSessionName.value || !selectedAgentId.value) {
-        message.warning("Name and Agent are required")
-        return
+  if (!newSessionName.value || !selectedAgentId.value) {
+    message.warning("名称和 Agent 为必填项");
+    return;
+  }
+  try {
+    const res = await CreateSession(
+      currentProjectId.value,
+      newSessionName.value,
+      selectedAgentId.value
+    );
+    if (res.code === 200) {
+      showCreateModal.value = false;
+      newSessionName.value = "";
+      selectedAgentId.value = null;
+      await loadSessions(currentProjectId.value);
+    } else {
+      message.error(res.msg);
     }
-    try {
-        const res = await CreateSession(currentProjectId.value, newSessionName.value, selectedAgentId.value)
-        if (res.code === 200) {
-            showCreateModal.value = false
-            newSessionName.value = ''
-            selectedAgentId.value = null
-            await loadSessions(currentProjectId.value)
-        } else {
-            message.error(res.msg)
-        }
-    } catch(e) {
-        message.error("Create failed: " + e)
-    }
+  } catch (e) {
+    message.error("创建失败: " + e);
+  }
 }
 
-
 function handleSelectSession(sid) {
-  currentSessionId.value = sid
-  router.push({ name: 'Chat', params: { sessionId: sid } })
-  messages.value = [] // TODO: Load history
+  currentSessionId.value = sid;
+  router.push({ name: "Chat", params: { sessionId: sid } });
+  messages.value = []; // TODO: Load history
 }
 
 async function handleDeleteSession(sid) {
   dialog.warning({
-    title: 'Delete Chat',
-    content: 'Are you sure?',
-    positiveText: 'Confirm',
-    negativeText: 'Cancel',
+    title: "删除会话",
+    content: "确定要删除吗？",
+    positiveText: "确认",
+    negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        const res = await DeleteSession(sid)
+        const res = await DeleteSession(sid);
         if (res.code === 200) {
           if (currentSessionId.value === sid) {
-            currentSessionId.value = null
-            router.push({ name: 'Chat' })
+            currentSessionId.value = null;
+            router.push({ name: "Chat" });
           }
-          await loadSessions(currentProjectId.value)
+          await loadSessions(currentProjectId.value);
         }
       } catch (e) {
-        message.error('Failed to delete')
+        message.error("删除失败");
       }
-    }
-  })
+    },
+  });
 }
 
 function scrollToBottom() {
-    nextTick(() => {
-        if (scrollbarRef.value) {
-            scrollbarRef.value.scrollTo({ top: 99999, behavior: 'smooth' })
-        }
-    })
+  nextTick(() => {
+    if (scrollbarRef.value) {
+      scrollbarRef.value.scrollTo({ top: 99999, behavior: "smooth" });
+    }
+  });
 }
 
 async function handleSend() {
-  if (!inputText.value.trim()) return
-  
-  const content = inputText.value
-  inputText.value = ''
-  
+  if (!inputText.value.trim()) return;
+
+  const content = inputText.value;
+  inputText.value = "";
+
   // Optimistic UI update
-  messages.value.push({ role: 'user', content: content })
-  scrollToBottom()
-  
+  messages.value.push({ role: "user", content: content });
+  scrollToBottom();
+
   // Placeholder for AI response
-  const aiMsgIndex = messages.value.push({ role: 'assistant', content: '' }) - 1
-  
+  const aiMsgIndex =
+    messages.value.push({ role: "assistant", content: "" }) - 1;
+
   try {
-      const res = await SendMessage(currentSessionId.value, content)
-      if (res.code !== 200) {
-          message.error(res.msg)
-          messages.value[aiMsgIndex].content = "[Error: " + res.msg + "]"
-      }
-  } catch(e) {
-      message.error("Send failed: " + e)
+    const res = await SendMessage(currentSessionId.value, content);
+    if (res.code !== 200) {
+      message.error(res.msg);
+      messages.value[aiMsgIndex].content = "[错误: " + res.msg + "]";
+    }
+  } catch (e) {
+    message.error("发送失败: " + e);
   }
 }
 
 // SSE Setup
 function initSSE() {
-    eventSource = new EventSource('http://localhost:8080/events')
-    eventSource.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data)
-            // Filter by current session
-            if (data.sessionId === currentSessionId.value) {
-                if (data.delta) {
-                    // Find last assistant message and append
-                    // Ideally we should have message ID, but for now assuming last message is the one streaming
-                    const lastMsg = messages.value[messages.value.length - 1]
-                    if (lastMsg && lastMsg.role === 'assistant') {
-                        lastMsg.content += data.delta
-                    } else {
-                        // If for some reason last msg is not assistant (should not happen with our logic), append new
-                        messages.value.push({ role: 'assistant', content: data.delta })
-                    }
-                    scrollToBottom()
-                }
-                if (data.error) {
-                    message.error("AI Error: " + data.error)
-                }
-            }
-        } catch(e) {
-            console.error("SSE Parse Error", e)
+  eventSource = new EventSource("http://localhost:8080/events");
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      // Filter by current session
+      if (data.sessionId === currentSessionId.value) {
+        if (data.delta) {
+          // Find last assistant message and append
+          // Ideally we should have message ID, but for now assuming last message is the one streaming
+          const lastMsg = messages.value[messages.value.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            lastMsg.content += data.delta;
+          } else {
+            // If for some reason last msg is not assistant (should not happen with our logic), append new
+            messages.value.push({ role: "assistant", content: data.delta });
+          }
+          scrollToBottom();
         }
+        if (data.error) {
+          message.error("AI 错误: " + data.error);
+        }
+      }
+    } catch (e) {
+      console.error("SSE Parse Error", e);
     }
+  };
 }
 
 onMounted(() => {
-  loadProjects()
-  loadAgents()
-  initSSE()
-})
+  loadProjects();
+  loadAgents();
+  initSSE();
+});
 
 onUnmounted(() => {
-    if (eventSource) {
-        eventSource.close()
-    }
-})
+  if (eventSource) {
+    eventSource.close();
+  }
+});
 </script>
 
 <style scoped>
@@ -351,7 +410,7 @@ onUnmounted(() => {
   flex: 1;
   padding: 20px;
   overflow: hidden;
-  background-color: #f5f5f5; 
+  background-color: #f5f5f5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -383,7 +442,7 @@ onUnmounted(() => {
   padding: 10px 14px;
   border-radius: 8px;
   background-color: #fff;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   white-space: pre-wrap;
   word-wrap: break-word;
 }
@@ -404,7 +463,7 @@ onUnmounted(() => {
 
 .input-area {
   padding: 16px;
-  border-top: 1px solid rgba(255,255,255,0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: flex-end;
   background-color: var(--n-color);
@@ -412,7 +471,8 @@ onUnmounted(() => {
 
 /* Markdown Styles */
 :deep(.markdown-body) {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    sans-serif;
 }
 :deep(.markdown-body pre) {
   background-color: #282c34;
@@ -422,7 +482,8 @@ onUnmounted(() => {
   color: #abb2bf;
 }
 :deep(.markdown-body code) {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+    monospace;
 }
 :deep(.markdown-body p) {
   margin-bottom: 8px;

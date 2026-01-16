@@ -1,9 +1,9 @@
 <template>
   <div>
     <n-space justify="space-between" align="center" style="margin-bottom: 16px">
-      <n-h2 style="margin: 0">Agents</n-h2>
+      <n-h2 style="margin: 0">智能体管理</n-h2>
       <n-button type="primary" @click="showCreateModal = true">
-        New Agent
+        新建智能体
       </n-button>
     </n-space>
 
@@ -15,31 +15,46 @@
     />
 
     <!-- Create/Edit Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? 'Edit Agent' : 'New Agent'" style="width: 700px">
-      <n-form ref="formRef" :model="formValue" :rules="rules" label-placement="left" label-width="120">
-        <n-form-item label="Name" path="name">
-          <n-input v-model:value="formValue.name" placeholder="Agent Name" />
+    <n-modal
+      v-model:show="showCreateModal"
+      preset="dialog"
+      :title="isEdit ? '编辑智能体' : '新建智能体'"
+      style="width: 700px"
+    >
+      <n-form
+        ref="formRef"
+        :model="formValue"
+        :rules="rules"
+        label-placement="left"
+        label-width="120"
+      >
+        <n-form-item label="名称" path="name">
+          <n-input v-model:value="formValue.name" placeholder="智能体名称" />
         </n-form-item>
-        <n-form-item label="Description" path="description">
-          <n-input v-model:value="formValue.description" placeholder="Description" />
+        <n-form-item label="描述" path="description">
+          <n-input v-model:value="formValue.description" placeholder="描述" />
         </n-form-item>
-        <n-form-item label="Model" path="modelId">
-            <n-select v-model:value="formValue.modelId" :options="modelOptions" placeholder="Select AI Model" />
+        <n-form-item label="模型" path="modelId">
+          <n-select
+            v-model:value="formValue.modelId"
+            :options="modelOptions"
+            placeholder="选择 AI 模型"
+          />
         </n-form-item>
-        <n-form-item label="System Prompt" path="systemPrompt">
+        <n-form-item label="系统提示词" path="systemPrompt">
           <n-input
             v-model:value="formValue.systemPrompt"
             type="textarea"
             :autosize="{ minRows: 5, maxRows: 10 }"
-            placeholder="You are a helpful assistant..."
+            placeholder="你是一个有用的助手..."
           />
         </n-form-item>
       </n-form>
       <template #action>
         <n-space>
-          <n-button @click="closeModal">Cancel</n-button>
+          <n-button @click="closeModal">取消</n-button>
           <n-button type="primary" :loading="submitting" @click="handleSubmit">
-            {{ isEdit ? 'Update' : 'Create' }}
+            {{ isEdit ? "更新" : "创建" }}
           </n-button>
         </n-space>
       </template>
@@ -48,155 +63,190 @@
 </template>
 
 <script setup>
-import { ref, onMounted, h } from 'vue'
-import { NButton, NSpace, useMessage, useDialog, NTag } from 'naive-ui'
-import { ListAgents, CreateAgent, UpdateAgent, DeleteAgent, ListAIModels } from '../../wailsjs/go/main/App'
+import { ref, onMounted, h } from "vue";
+import { NButton, NSpace, useMessage, useDialog, NTag } from "naive-ui";
+import {
+  ListAgents,
+  CreateAgent,
+  UpdateAgent,
+  DeleteAgent,
+  ListAIModels,
+} from "../../wailsjs/go/main/App";
 
-const message = useMessage()
-const dialog = useDialog()
+const message = useMessage();
+const dialog = useDialog();
 
-const agents = ref([])
-const modelOptions = ref([])
-const loading = ref(false)
-const showCreateModal = ref(false)
-const submitting = ref(false)
-const isEdit = ref(false)
-const editingId = ref(null)
+const agents = ref([]);
+const modelOptions = ref([]);
+const loading = ref(false);
+const showCreateModal = ref(false);
+const submitting = ref(false);
+const isEdit = ref(false);
+const editingId = ref(null);
 
 const formValue = ref({
-  name: '',
-  description: '',
-  systemPrompt: '',
-  modelId: null
-})
+  name: "",
+  description: "",
+  systemPrompt: "",
+  modelId: null,
+});
 
 const rules = {
-  name: { required: true, message: 'Required', trigger: 'blur' },
-  modelId: { required: true, message: 'Required', type: 'number', trigger: 'blur' }
-}
+  name: { required: true, message: "必填", trigger: "blur" },
+  modelId: { required: true, message: "必填", type: "number", trigger: "blur" },
+};
 
-const pagination = { pageSize: 10 }
+const pagination = { pageSize: 10 };
 
 const columns = [
-  { title: 'Name', key: 'name', width: 150 },
-  { title: 'Description', key: 'description' },
-  { 
-      title: 'Model', 
-      key: 'Model', 
-      width: 150,
-      render(row) {
-          return row.Model ? h(NTag, { type: 'info' }, { default: () => row.Model.name }) : 'N/A'
-      }
+  { title: "名称", key: "name", width: 150 },
+  { title: "描述", key: "description" },
+  {
+    title: "模型",
+    key: "Model",
+    width: 150,
+    render(row) {
+      return row.Model
+        ? h(NTag, { type: "info" }, { default: () => row.Model.name })
+        : "无";
+    },
   },
   {
-    title: 'Action',
-    key: 'actions',
+    title: "操作",
+    key: "actions",
     width: 150,
     render(row) {
       return h(NSpace, null, {
         default: () => [
-          h(NButton, { size: 'small', onClick: () => handleEdit(row) }, { default: () => 'Edit' }),
-          h(NButton, { size: 'small', type: 'error', onClick: () => handleDelete(row) }, { default: () => 'Delete' })
-        ]
-      })
-    }
-  }
-]
+          h(
+            NButton,
+            { size: "small", onClick: () => handleEdit(row) },
+            { default: () => "编辑" }
+          ),
+          h(
+            NButton,
+            { size: "small", type: "error", onClick: () => handleDelete(row) },
+            { default: () => "删除" }
+          ),
+        ],
+      });
+    },
+  },
+];
 
 async function loadData() {
-  loading.value = true
+  loading.value = true;
   try {
     // Load Models first for select options
-    const modelRes = await ListAIModels()
+    const modelRes = await ListAIModels();
     if (modelRes.code === 200) {
-        modelOptions.value = (modelRes.data || []).map(m => ({ label: m.name, value: m.id }))
+      modelOptions.value = (modelRes.data || []).map((m) => ({
+        label: m.name,
+        value: m.id,
+      }));
     }
 
     // Load Agents
-    const res = await ListAgents()
+    const res = await ListAgents();
     if (res.code === 200) {
-      agents.value = res.data || []
+      agents.value = res.data || [];
     } else {
-      message.error(res.msg)
+      message.error(res.msg);
     }
   } catch (e) {
-    message.error('Failed to load data: ' + e)
+    message.error("加载数据失败: " + e);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function handleEdit(row) {
-  isEdit.value = true
-  editingId.value = row.id
+  isEdit.value = true;
+  editingId.value = row.id;
   formValue.value = {
     name: row.name,
     description: row.description,
     systemPrompt: row.systemPrompt,
-    modelId: row.modelId
-  }
-  showCreateModal.value = true
+    modelId: row.modelId,
+  };
+  showCreateModal.value = true;
 }
 
 function handleDelete(row) {
   dialog.warning({
-    title: 'Confirm Delete',
-    content: `Delete agent "${row.name}"?`,
-    positiveText: 'Confirm',
-    negativeText: 'Cancel',
+    title: "确认删除",
+    content: `确认删除智能体 "${row.name}"?`,
+    positiveText: "确认",
+    negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        const res = await DeleteAgent(row.id)
+        const res = await DeleteAgent(row.id);
         if (res.code === 200) {
-          message.success('Deleted')
-          loadData()
+          message.success("已删除");
+          loadData();
         } else {
-          message.error(res.msg)
+          message.error(res.msg);
         }
       } catch (e) {
-        message.error('Failed to delete: ' + e)
+        message.error("删除失败: " + e);
       }
-    }
-  })
+    },
+  });
 }
 
 function closeModal() {
-  showCreateModal.value = false
-  formValue.value = { name: '', description: '', systemPrompt: '', modelId: null }
-  isEdit.value = false
-  editingId.value = null
+  showCreateModal.value = false;
+  formValue.value = {
+    name: "",
+    description: "",
+    systemPrompt: "",
+    modelId: null,
+  };
+  isEdit.value = false;
+  editingId.value = null;
 }
 
 async function handleSubmit() {
   if (!formValue.value.name || !formValue.value.modelId) {
-    message.warning('Name and Model are required')
-    return
+    message.warning("名称和模型为必填项");
+    return;
   }
-  
-  submitting.value = true
+
+  submitting.value = true;
   try {
-    let res
+    let res;
     if (isEdit.value) {
-      res = await UpdateAgent(editingId.value, formValue.value.name, formValue.value.description, formValue.value.systemPrompt, formValue.value.modelId)
+      res = await UpdateAgent(
+        editingId.value,
+        formValue.value.name,
+        formValue.value.description,
+        formValue.value.systemPrompt,
+        formValue.value.modelId
+      );
     } else {
-      res = await CreateAgent(formValue.value.name, formValue.value.description, formValue.value.systemPrompt, formValue.value.modelId)
+      res = await CreateAgent(
+        formValue.value.name,
+        formValue.value.description,
+        formValue.value.systemPrompt,
+        formValue.value.modelId
+      );
     }
-    
+
     if (res.code === 200) {
-      message.success(isEdit.value ? 'Updated' : 'Created')
-      closeModal()
-      loadData()
+      message.success(isEdit.value ? "更新成功" : "创建成功");
+      closeModal();
+      loadData();
     } else {
-      message.error(res.msg)
+      message.error(res.msg);
     }
   } catch (e) {
-    message.error('Operation failed: ' + e)
+    message.error("操作失败: " + e);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 
 onMounted(() => {
-  loadData()
-})
+  loadData();
+});
 </script>
