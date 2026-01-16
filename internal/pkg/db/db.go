@@ -2,6 +2,7 @@ package db
 
 import (
 	"iat/internal/model"
+	"iat/internal/pkg/consts"
 	"iat/internal/pkg/tools/builtin"
 	"log"
 	"os"
@@ -59,7 +60,7 @@ func InitDB() error {
 func seedBuiltinTools(db *gorm.DB) {
 	for _, tool := range builtin.BuiltinTools {
 		var count int64
-		db.Model(&model.Tool{}).Where("name = ? AND type = ?", tool.Name, "builtin").Count(&count)
+		db.Model(&model.Tool{}).Where("name = ? AND type = ?", tool.Name, consts.ToolTypeBuiltin).Count(&count)
 		if count == 0 {
 			db.Create(&tool)
 			log.Printf("Seeded builtin tool: %s", tool.Name)
@@ -70,17 +71,17 @@ func seedBuiltinTools(db *gorm.DB) {
 func seedBuiltinAgents(db *gorm.DB) {
 	agents := []model.Agent{
 		{
-			Name:        "Chat",
+			Name:        consts.AgentNameChat,
 			Description: "A helpful AI assistant for general conversation.",
-			Type:        "builtin",
+			Type:        consts.AgentTypeBuiltin,
 			SystemPrompt: `You are a helpful, intelligent assistant. 
 Your goal is to provide accurate, concise, and useful information to the user.
 You can help with a wide range of tasks, including answering questions, explaining concepts, and engaging in general conversation.`,
 		},
 		{
-			Name:        "Plan",
+			Name:        consts.AgentNamePlan,
 			Description: "A planning expert that helps breakdown complex tasks.",
-			Type:        "builtin",
+			Type:        consts.AgentTypeBuiltin,
 			SystemPrompt: `You are an expert planner and project manager.
 Your goal is to help the user break down complex problems or tasks into manageable steps.
 When presented with a goal, you should:
@@ -91,9 +92,9 @@ When presented with a goal, you should:
 Output the plan in a clear, Markdown-formatted list.`,
 		},
 		{
-			Name:        "Build",
+			Name:        consts.AgentNameBuild,
 			Description: "A coding and build automation expert.",
-			Type:        "builtin",
+			Type:        consts.AgentTypeBuiltin,
 			SystemPrompt: `You are an expert software engineer and build automation specialist.
 Your capabilities include writing code, debugging, and generating build scripts.
 You should:
@@ -107,7 +108,7 @@ When asked to build something, consider the environment, dependencies, and execu
 
 	for _, agent := range agents {
 		var count int64
-		db.Model(&model.Agent{}).Where("name = ? AND type = ?", agent.Name, "builtin").Count(&count)
+		db.Model(&model.Agent{}).Where("name = ? AND type = ?", agent.Name, consts.AgentTypeBuiltin).Count(&count)
 		if count == 0 {
 			// Try to assign a default model if exists
 			var firstModel model.AIModel

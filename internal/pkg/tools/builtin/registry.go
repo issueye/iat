@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"iat/internal/model"
 
+	"iat/internal/pkg/consts"
+
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
 )
@@ -23,17 +25,17 @@ func GetEinoTools(agentName string) []*schema.ToolInfo {
 	var tools []*schema.ToolInfo
 	for _, t := range BuiltinTools {
 		// Permission Filter based on Agent Name
-		if agentName == "Chat" {
+		if agentName == consts.AgentNameChat {
 			// Chat agent gets NO tools
 			continue
-		} else if agentName == "Plan" {
+		} else if agentName == consts.AgentNamePlan {
 			// Plan agent only gets file operations (read/write/list)
 			// We can filter by name or some property. 
 			// Assuming file operations are: read_file, write_file, list_files
 			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" {
 				continue
 			}
-		} else if agentName == "Build" {
+		} else if agentName == consts.AgentNameBuild {
 			// Build agent gets ALL tools
 		} else {
 			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
@@ -77,7 +79,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "read_file",
 		Description: "Read the contents of a file from the local filesystem",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "ReadFile",
 		Parameters: `{
 			"type": "object",
@@ -93,7 +95,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "write_file",
 		Description: "Write content to a file on the local filesystem (overwrites if exists)",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "WriteFile",
 		Parameters: `{
 			"type": "object",
@@ -113,7 +115,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "list_files",
 		Description: "List files and directories in a given directory path",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "ListFiles",
 		Parameters: `{
 			"type": "object",
@@ -131,7 +133,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "run_command",
 		Description: "Execute a shell command",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "RunCommand",
 		Parameters: `{
 			"type": "object",
@@ -156,7 +158,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "http_get",
 		Description: "Perform an HTTP GET request",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "HttpGet",
 		Parameters: `{
 			"type": "object",
@@ -172,7 +174,7 @@ var BuiltinTools = []model.Tool{
 	{
 		Name:        "http_post",
 		Description: "Perform an HTTP POST request",
-		Type:        "builtin",
+		Type:        consts.ToolTypeBuiltin,
 		Content:     "HttpPost",
 		Parameters: `{
 			"type": "object",

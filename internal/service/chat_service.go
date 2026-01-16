@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"iat/internal/model"
 	"iat/internal/pkg/ai"
+	"iat/internal/pkg/consts"
 	"iat/internal/pkg/sse"
 	"iat/internal/pkg/tools/builtin"
 	"iat/internal/pkg/tools/script"
@@ -67,16 +68,16 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	// Chat: only chat, no tools (implicitly handled if tools are not bound)
 	// Plan: only plan directory operations
 	// Build: all authorized tools
-	if agent.Name == "Chat" && agent.Type == "builtin" {
+	if agent.Name == consts.AgentNameChat && agent.Type == consts.AgentTypeBuiltin {
 		// Chat agent should not execute tools
 		// We can clear tools if they are somehow attached
 		agent.Tools = nil
-	} else if agent.Name == "Plan" && agent.Type == "builtin" {
+	} else if agent.Name == consts.AgentNamePlan && agent.Type == consts.AgentTypeBuiltin {
 		// Plan agent: Ensure system prompt includes instructions to only operate in 'plan' directory
 		// And maybe we can enforce it in tool implementation (but that requires context awareness in tool)
 		// For now, let's append a strict instruction to system prompt
 		agent.SystemPrompt += "\n\nIMPORTANT: You are strictly limited to operating within the 'plan' directory. Do not read or write files outside of this directory."
-	} else if agent.Name == "Build" && agent.Type == "builtin" {
+	} else if agent.Name == consts.AgentNameBuild && agent.Type == consts.AgentTypeBuiltin {
 		// Build agent has all permissions.
 	}
 
@@ -105,7 +106,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
 				
 				for _, t := range agent.Tools {
-					if t.Type == "custom" {
+					if t.Type == consts.ToolTypeCustom {
 						var s jsonschema.Schema
 						if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
 							fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
@@ -146,7 +147,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	// Save User Message
 	userMsg := &model.Message{
 		SessionID: sessionID,
-		Role:      "user",
+		Role:      consts.RoleUser,
 		Content:   userMessage,
 	}
 	if err := s.messageRepo.Create(userMsg); err != nil {
@@ -168,7 +169,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	
 	for _, msg := range history {
 		role := schema.User
-		if msg.Role == "assistant" {
+		if msg.Role == consts.RoleAssistant {
 			role = schema.Assistant
 		}
 		messages = append(messages, &schema.Message{
@@ -272,7 +273,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 			if fullResponse != "" || len(toolCalls) > 0 {
 				aiMsg := &model.Message{
 					SessionID:  sessionID,
-					Role:       "assistant",
+					Role:       consts.RoleAssistant,
 					Content:    fullResponse,
 				}
 				
@@ -327,7 +328,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					switch fnName {
 					case "read_file":
 						path, _ := args["path"].(string)
-						if agent.Name == "Plan" && !strings.Contains(path, "plan") {
+						if agent.Name == consts.AgentNamePlan && !strings.Contains(path, "plan") {
 							// Check restriction
 						}
 						res, err := builtin.ReadFile(path)
@@ -372,7 +373,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					// For now, let's look up the tool in the agent's tools list.
 					var foundTool *model.Tool
 					for _, t := range agent.Tools {
-						if t.Name == fnName && t.Type == "custom" {
+						if t.Name == fnName && t.Type == consts.ToolTypeCustom {
 							foundTool = &t
 							break
 						}
