@@ -149,16 +149,25 @@
                   </template>
                 </div>
               </div>
-              <div v-else-if="!item.isMarkdown">
+              <div v-else-if="item.role === 'assistant'">
+                <Thinking
+                  v-if="splitThinkContent(item.content).think"
+                  v-model="item.thinkExpanded"
+                  :content="splitThinkContent(item.content).think"
+                  :status="getThinkingStatus(item)"
+                  auto-collapse
+                />
+                <XMarkdown
+                  v-if="splitThinkContent(item.content).answer"
+                  :markdown="splitThinkContent(item.content).answer"
+                  default-theme-mode="light"
+                  style="text-align: left"
+                  :code-x-props="{ enableCodeLineNumber: true }"
+                />
+              </div>
+              <div v-else>
                 {{ item.content }}
               </div>
-              <XMarkdown
-                v-else
-                :markdown="item.content"
-                default-theme-mode="light"
-                style="text-align: left"
-                :code-x-props="{ enableCodeLineNumber: true }"
-              />
             </template>
             <template #footer="{ item }">
               <div style="margin-top: 4px; font-size: 12px; color: #999">
@@ -169,6 +178,17 @@
                   {{ formatTime(item.createdAt) ? " · " : "" }}Tokens:
                   {{ item.tokenUsage }}
                 </span>
+                <n-button
+                  v-if="item.role === 'user'"
+                  size="tiny"
+                  text
+                  type="primary"
+                  style="margin-left: 8px"
+                  :disabled="isGenerating"
+                  @click="handleResend(item.content)"
+                >
+                  重新发送
+                </n-button>
                 <n-button
                   v-if="item.role === 'assistant' && item.prompt"
                   size="tiny"
@@ -380,6 +400,14 @@ const currentChatAgentId = ref(null);
 const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
+const generationStatus = ref("end");
+
+const lastAssistantMessage = computed(() => {
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    if (messages.value[i]?.role === "assistant") return messages.value[i];
+  }
+  return null;
+});
 
 const modeOptions = [
   { label: "对话 (Chat)", value: "chat" },
@@ -406,6 +434,41 @@ const toolInvocations = ref([]);
 const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
 const searchingSessions = ref(false);
+
+function splitThinkContent(text) {
+  const raw = String(text || "");
+  const thinkParts = [];
+  const thinkRe = /<think>([\s\S]*?)<\/think>/g;
+  let answer = raw.replace(thinkRe, (_, inner) => {
+    const s = String(inner || "").trim();
+    if (s) thinkParts.push(s);
+    return "";
+  });
+
+  const openIdx = answer.lastIndexOf("<think>");
+  if (openIdx !== -1) {
+    const before = answer.slice(0, openIdx);
+    const after = answer.slice(openIdx + "<think>".length);
+    answer = before;
+    const s = String(after || "").trim();
+    if (s) thinkParts.push(s);
+  }
+
+  return {
+    think: thinkParts.join("\n\n"),
+    answer: String(answer || "").replace(/<\/think>/g, "").trim(),
+  };
+}
+
+function getThinkingStatus(item) {
+  if (item !== lastAssistantMessage.value) return "end";
+  if (generationStatus.value === "cancel") return "cancel";
+  if (generationStatus.value === "error") return "error";
+  if (isGenerating.value) {
+    return generationStatus.value === "start" ? "start" : "thinking";
+  }
+  return "end";
+}
 
 const isSearchingSessions = computed(() => {
   return String(sessionSearchQuery.value || "").trim() !== "";
@@ -507,6 +570,9 @@ function applyMessageMeta(item) {
   } else {
     item.placement = "start";
     item.avatar = aiAvatar;
+  }
+  if (item.role === "assistant" && typeof item.thinkExpanded !== "boolean") {
+    item.thinkExpanded = false;
   }
   return item;
 }
@@ -741,10 +807,15 @@ async function handleDeleteSession(sid) {
 }
 
 async function handleSend(payload) {
+  if (isGenerating.value) {
+    message.warning("正在生成中，请稍后再试");
+    return;
+  }
   const content = typeof payload === "string" ? payload : inputText.value;
   if (!content || !content.trim()) return;
 
   inputText.value = "";
+  generationStatus.value = "start";
 
   // Optimistic UI update
   messages.value.push(
@@ -758,15 +829,15 @@ async function handleSend(payload) {
 
   // Placeholder for AI response
   const aiMsgIndex =
-    messages.value.push({
-      role: "assistant",
-      content: "",
-      isMarkdown: true,
-      tokenUsage: 0,
-      createdAt: new Date().toISOString(),
-      placement: "start",
-      avatar: aiAvatar,
-    }) - 1;
+    messages.value.push(
+      applyMessageMeta({
+        role: "assistant",
+        content: "",
+        isMarkdown: true,
+        tokenUsage: 0,
+        createdAt: new Date().toISOString(),
+      })
+    ) - 1;
 
   isGenerating.value = true;
 
@@ -783,6 +854,7 @@ async function handleSend(payload) {
       message.error(res.msg);
       messages.value[aiMsgIndex].content = "[错误: " + res.msg + "]";
       isGenerating.value = false;
+      generationStatus.value = "error";
     }
   } catch (e) {
     message.error("发送失败: " + e);
@@ -793,6 +865,7 @@ async function handleSend(payload) {
       messages.value[aiMsgIndex].content = "[错误: 发送失败]";
     }
     isGenerating.value = false;
+    generationStatus.value = "error";
   }
 }
 
@@ -808,7 +881,7 @@ function initSSE() {
           handleToolEvent(data.tool);
         }
         if (data.delta) {
-          console.log("data.delta", data.delta);
+          if (generationStatus.value === "start") generationStatus.value = "thinking";
 
           let appended = false;
           for (let i = messages.value.length - 1; i >= 0; i--) {
@@ -841,6 +914,7 @@ function initSSE() {
         }
         if (data.done) {
           isGenerating.value = false;
+          generationStatus.value = "end";
           const last = messages.value[messages.value.length - 1];
           if (last?.role === "assistant" && String(last.content || "").trim() === "") {
             messages.value.pop();
@@ -849,6 +923,7 @@ function initSSE() {
         if (data.terminated) {
           message.warning("已终止生成");
           isGenerating.value = false;
+          generationStatus.value = "cancel";
           const last = messages.value[messages.value.length - 1];
           if (last?.role === "assistant" && String(last.content || "").trim() === "") {
             messages.value.pop();
@@ -865,6 +940,7 @@ function initSSE() {
           }
           message.error("AI 错误: " + data.error);
           isGenerating.value = false;
+          generationStatus.value = "error";
         }
       }
     } catch (e) {
@@ -886,6 +962,7 @@ async function handleClearSession() {
         messages.value = [];
         toolBubbleIndexByCallId.clear();
         isGenerating.value = false;
+        generationStatus.value = "end";
       } else {
         message.error(res.msg || "清空失败");
       }
@@ -898,6 +975,7 @@ async function handleTerminateSession() {
   const res = await TerminateSession(currentSessionId.value);
   if (res.code === 200) {
     isGenerating.value = false;
+    generationStatus.value = "cancel";
   } else {
     message.error(res.msg || "终止失败");
   }
@@ -941,6 +1019,21 @@ function handleViewPrompt(prompt) {
     currentViewPrompt.value = prompt;
   }
   showPromptModal.value = true;
+}
+
+function handleResend(content) {
+  if (isGenerating.value) return;
+  const text = String(content || "");
+  if (!text.trim()) return;
+  dialog.warning({
+    title: "重新发送",
+    content: "将重新发送该条内容并继续当前会话，是否继续？",
+    positiveText: "继续",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      await handleSend(text);
+    },
+  });
 }
 
 onMounted(() => {
