@@ -169,6 +169,16 @@
                   {{ formatTime(item.createdAt) ? " · " : "" }}Tokens:
                   {{ item.tokenUsage }}
                 </span>
+                <n-button
+                  v-if="item.role === 'assistant' && item.prompt"
+                  size="tiny"
+                  text
+                  type="primary"
+                  style="margin-left: 8px"
+                  @click="handleViewPrompt(item.prompt)"
+                >
+                  查看 Prompt
+                </n-button>
               </div>
             </template>
           </BubbleList>
@@ -305,6 +315,27 @@
         </n-collapse>
       </div>
     </n-modal>
+
+    <n-modal
+      v-model:show="showPromptModal"
+      preset="dialog"
+      title="完整发送内容 (Prompt)"
+      :style="{ width: '800px', maxWidth: 'calc(100vw - 32px)' }"
+    >
+      <div style="max-height: 600px; overflow: auto">
+        <pre
+          style="
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-break: break-all;
+          "
+          >{{ currentViewPrompt }}</pre
+        >
+      </div>
+    </n-modal>
   </n-layout>
 </template>
 
@@ -369,6 +400,8 @@ const newSessionName = ref("");
 const selectedMode = ref("chat");
 const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
+const showPromptModal = ref(false);
+const currentViewPrompt = ref("");
 const toolInvocations = ref([]);
 const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
@@ -645,6 +678,7 @@ async function loadHistory(sid) {
           applyMessageMeta({
             role: msg.role,
             content: msg.content,
+            prompt: msg.prompt,
             isMarkdown: msg.role === "assistant",
             tokenUsage:
               msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
@@ -892,6 +926,16 @@ async function openSessionDetail() {
   } else {
     message.error(res.msg || "加载详情失败");
   }
+}
+
+function handleViewPrompt(prompt) {
+  try {
+    const parsed = JSON.parse(prompt);
+    currentViewPrompt.value = JSON.stringify(parsed, null, 2);
+  } catch (e) {
+    currentViewPrompt.value = prompt;
+  }
+  showPromptModal.value = true;
 }
 
 onMounted(() => {

@@ -373,6 +373,11 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 			// Create a copy of messages to avoid race conditions if needed,
 			// but here we are in a single goroutine sequentially updating messages.
 
+			// 376: stream, err := aiClient.StreamChat(ctx, messages)
+			// Capture the prompt sent to AI
+			promptJSON, _ := json.Marshal(messages)
+			currentPrompt := string(promptJSON)
+
 			stream, err := aiClient.StreamChat(ctx, messages)
 			if err != nil {
 				errMsg, _ := json.Marshal(map[string]interface{}{
@@ -469,6 +474,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					SessionID: sessionID,
 					Role:      consts.RoleAssistant,
 					Content:   fullResponse,
+					Prompt:    currentPrompt,
 				}
 
 				// Calculate real usage
