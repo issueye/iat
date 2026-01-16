@@ -111,27 +111,6 @@ func seedBuiltinAgents(db *gorm.DB) {
 
 	agents := []model.Agent{
 		{
-			Name:         consts.AgentNameChat,
-			Description:  "A helpful AI assistant for general conversation.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptChat,
-			ModeID:       chatMode.ID,
-		},
-		{
-			Name:         consts.AgentNamePlan,
-			Description:  "A planning expert that helps breakdown complex tasks.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptPlan,
-			ModeID:       planMode.ID,
-		},
-		{
-			Name:         consts.AgentNameBuild,
-			Description:  "A coding and build automation expert.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptBuild,
-			ModeID:       buildMode.ID,
-		},
-		{
 			Name:         consts.AgentNameProductManager,
 			Description:  "Analyzes requirements and defines product features (PRD).",
 			Type:         consts.AgentTypeBuiltin,

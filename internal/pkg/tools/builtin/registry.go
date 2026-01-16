@@ -25,17 +25,17 @@ func GetEinoTools(modeKey string) []*schema.ToolInfo {
 	var tools []*schema.ToolInfo
 	for _, t := range BuiltinTools {
 		// Permission Filter based on Agent Name
-		if modeKey == "chat" {
+		if modeKey == consts.ModeNameChat {
 			// Chat agent gets NO tools
 			continue
-		} else if modeKey == "plan" {
+		} else if modeKey == consts.ModeNamePlan {
 			// Plan agent only gets file operations (read/write/list)
 			// We can filter by name or some property. 
 			// Assuming file operations are: read_file, write_file, list_files
 			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" {
 				continue
 			}
-		} else if modeKey == "build" {
+		} else if modeKey == consts.ModeNameBuild {
 			// Build agent gets ALL tools
 		} else {
 			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
