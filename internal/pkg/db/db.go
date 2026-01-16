@@ -35,6 +35,8 @@ func InitDB() error {
 		&model.Session{},
 		&model.Message{},
 		&model.AIModel{},
+		&model.Script{},
+		&model.Agent{},
 	)
 	if err != nil {
 		return err

@@ -14,6 +14,7 @@ type App struct {
 	projectService *service.ProjectService
 	modelService   *service.AIModelService
 	sessionService *service.SessionService
+	scriptService  *service.ScriptService
 }
 
 // NewApp creates a new App application struct
@@ -22,6 +23,7 @@ func NewApp() *App {
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
 		sessionService: service.NewSessionService(),
+		scriptService:  service.NewScriptService(),
 	}
 }
 
@@ -128,4 +130,46 @@ func (a *App) DeleteSession(id uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
+}
+
+// --- Script Methods ---
+
+func (a *App) CreateScript(name, description, content string) *common.Result {
+	err := a.scriptService.CreateScript(name, description, content)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) UpdateScript(id uint, name, description, content string) *common.Result {
+	err := a.scriptService.UpdateScript(id, name, description, content)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) ListScripts() *common.Result {
+	scripts, err := a.scriptService.ListScripts()
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(scripts)
+}
+
+func (a *App) DeleteScript(id uint) *common.Result {
+	err := a.scriptService.DeleteScript(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) RunScript(id uint) *common.Result {
+	res, err := a.scriptService.RunScript(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(res)
 }
