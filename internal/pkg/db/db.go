@@ -37,6 +37,7 @@ func InitDB() error {
 		&model.AIModel{},
 		&model.Script{},
 		&model.Agent{},
+		&model.Tool{},
 	)
 	if err != nil {
 		return err

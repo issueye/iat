@@ -17,6 +17,7 @@ type App struct {
 	sessionService *service.SessionService
 	scriptService  *service.ScriptService
 	agentService   *service.AgentService
+	toolService    *service.ToolService
 	chatService    *service.ChatService
 }
 
@@ -28,6 +29,7 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		sessionService: service.NewSessionService(),
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
+		toolService:    service.NewToolService(),
 		chatService:    service.NewChatService(sseHandler),
 	}
 }
@@ -207,6 +209,40 @@ func (a *App) ListAgents() *common.Result {
 
 func (a *App) DeleteAgent(id uint) *common.Result {
 	err := a.agentService.DeleteAgent(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+// --- Tool Methods ---
+
+func (a *App) CreateTool(tool model.Tool) *common.Result {
+	err := a.toolService.CreateTool(&tool)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) UpdateTool(tool model.Tool) *common.Result {
+	err := a.toolService.UpdateTool(&tool)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) ListTools() *common.Result {
+	tools, err := a.toolService.ListTools()
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(tools)
+}
+
+func (a *App) DeleteTool(id uint) *common.Result {
+	err := a.toolService.DeleteTool(id)
 	if err != nil {
 		return common.Fail(err.Error())
 	}

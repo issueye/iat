@@ -31,6 +31,11 @@ const routes = [
                 component: () => import('../views/Agents.vue')
             },
             {
+                path: 'tools',
+                name: 'Tools',
+                component: () => import('../views/Tools.vue')
+            },
+            {
                 path: 'chat/:sessionId?',
                 name: 'Chat',
                 component: () => import('../views/Chat.vue')

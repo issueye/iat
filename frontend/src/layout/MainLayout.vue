@@ -37,6 +37,7 @@ import {
   HardwareChipOutline as ModelIcon,
   CodeSlashOutline as ScriptIcon,
   PeopleOutline as AgentIcon,
+  HammerOutline as ToolIcon,
   ChatbubbleOutline as ChatIcon,
 } from "@vicons/ionicons5";
 
@@ -86,6 +87,12 @@ const menuOptions = [
     key: "Agents",
     icon: renderIcon(AgentIcon),
     onClick: () => router.push({ name: "Agents" }),
+  },
+  {
+    label: "工具管理",
+    key: "Tools",
+    icon: renderIcon(ToolIcon),
+    onClick: () => router.push({ name: "Tools" }),
   },
   {
     label: "智能对话",

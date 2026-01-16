@@ -22,6 +22,10 @@ export function CreateSession(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateSession'](arg1, arg2, arg3);
 }
 
+export function CreateTool(arg1) {
+  return window['go']['main']['App']['CreateTool'](arg1);
+}
+
 export function DeleteAIModel(arg1) {
   return window['go']['main']['App']['DeleteAIModel'](arg1);
 }
@@ -40,6 +44,10 @@ export function DeleteScript(arg1) {
 
 export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
+export function DeleteTool(arg1) {
+  return window['go']['main']['App']['DeleteTool'](arg1);
 }
 
 export function Greet(arg1) {
@@ -70,6 +78,10 @@ export function ListSessions(arg1) {
   return window['go']['main']['App']['ListSessions'](arg1);
 }
 
+export function ListTools() {
+  return window['go']['main']['App']['ListTools']();
+}
+
 export function RunScript(arg1) {
   return window['go']['main']['App']['RunScript'](arg1);
 }
@@ -92,4 +104,8 @@ export function UpdateProject(arg1, arg2, arg3) {
 
 export function UpdateScript(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateScript'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateTool(arg1) {
+  return window['go']['main']['App']['UpdateTool'](arg1);
 }

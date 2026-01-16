@@ -13,6 +13,8 @@ export function CreateScript(arg1:string,arg2:string,arg3:string):Promise<common
 
 export function CreateSession(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
 
+export function CreateTool(arg1:model.Tool):Promise<common.Result>;
+
 export function DeleteAIModel(arg1:number):Promise<common.Result>;
 
 export function DeleteAgent(arg1:number):Promise<common.Result>;
@@ -22,6 +24,8 @@ export function DeleteProject(arg1:number):Promise<common.Result>;
 export function DeleteScript(arg1:number):Promise<common.Result>;
 
 export function DeleteSession(arg1:number):Promise<common.Result>;
+
+export function DeleteTool(arg1:number):Promise<common.Result>;
 
 export function Greet(arg1:string):Promise<string>;
 
@@ -37,6 +41,8 @@ export function ListScripts():Promise<common.Result>;
 
 export function ListSessions(arg1:number):Promise<common.Result>;
 
+export function ListTools():Promise<common.Result>;
+
 export function RunScript(arg1:number):Promise<common.Result>;
 
 export function SendMessage(arg1:number,arg2:string):Promise<common.Result>;
@@ -48,3 +54,5 @@ export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5
 export function UpdateProject(arg1:number,arg2:string,arg3:string):Promise<common.Result>;
 
 export function UpdateScript(arg1:number,arg2:string,arg3:string,arg4:string):Promise<common.Result>;
+
+export function UpdateTool(arg1:model.Tool):Promise<common.Result>;
