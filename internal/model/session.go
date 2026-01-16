@@ -5,4 +5,6 @@ type Session struct {
 	ProjectID uint    `json:"projectId"`
 	Project   Project `json:"-"`
 	Name      string  `json:"name"`
+	AgentID   uint    `json:"agentId"`
+	Agent     Agent   `json:"-"`
 }

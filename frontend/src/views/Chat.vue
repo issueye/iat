@@ -16,7 +16,7 @@
         />
       </div>
       
-      <n-button block dashed style="margin-bottom: 12px" @click="handleCreateSession" :disabled="!currentProjectId">
+      <n-button block dashed style="margin-bottom: 12px" @click="showCreateModal = true" :disabled="!currentProjectId">
         + New Chat
       </n-button>
 
@@ -60,9 +60,10 @@
                   </n-avatar>
                 </div>
                 <div class="message-content">
-                  <div class="message-bubble">
+                  <div class="message-bubble" v-if="msg.role === 'user'">
                     {{ msg.content }}
                   </div>
+                   <div class="message-bubble markdown-body" v-else v-html="renderMarkdown(msg.content)"></div>
                 </div>
               </div>
             </div>
@@ -84,15 +85,32 @@
         </div>
       </template>
     </n-layout-content>
+
+    <!-- Create Session Modal -->
+    <n-modal v-model:show="showCreateModal" preset="dialog" title="New Chat" style="width: 400px">
+        <n-form>
+            <n-form-item label="Session Name">
+                <n-input v-model:value="newSessionName" placeholder="My Chat" />
+            </n-form-item>
+            <n-form-item label="Select Agent">
+                <n-select v-model:value="selectedAgentId" :options="agentOptions" />
+            </n-form-item>
+        </n-form>
+        <template #action>
+            <n-button @click="showCreateModal = false">Cancel</n-button>
+            <n-button type="primary" @click="confirmCreateSession">Create</n-button>
+        </template>
+    </n-modal>
   </n-layout>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMessage, useDialog, NIcon } from 'naive-ui'
 import { TrashOutline } from '@vicons/ionicons5'
-import { ListProjects, ListSessions, CreateSession, DeleteSession } from '../../wailsjs/go/main/App'
+import { ListProjects, ListSessions, CreateSession, DeleteSession, ListAgents, SendMessage } from '../../wailsjs/go/main/App'
+import { renderMarkdown } from '../utils/markdown'
 
 const route = useRoute()
 const router = useRouter()
@@ -102,13 +120,24 @@ const dialog = useDialog()
 // State
 const projects = ref([])
 const sessions = ref([])
+const agents = ref([])
 const currentProjectId = ref(null)
 const currentSessionId = ref(null)
-const messages = ref([]) // Temporary local state for messages
+const messages = ref([]) 
 const inputText = ref('')
+const scrollbarRef = ref(null)
+
+// Create Modal State
+const showCreateModal = ref(false)
+const newSessionName = ref('')
+const selectedAgentId = ref(null)
+
+// SSE
+let eventSource = null
 
 // Computeds
 const projectOptions = ref([])
+const agentOptions = ref([])
 
 // Methods
 async function loadProjects() {
@@ -118,7 +147,6 @@ async function loadProjects() {
       projects.value = res.data || []
       projectOptions.value = projects.value.map(p => ({ label: p.name, value: p.id }))
       
-      // Auto select first project if none selected
       if (!currentProjectId.value && projects.value.length > 0) {
         currentProjectId.value = projects.value[0].id
         await loadSessions(currentProjectId.value)
@@ -129,19 +157,29 @@ async function loadProjects() {
   }
 }
 
+async function loadAgents() {
+    try {
+        const res = await ListAgents()
+        if (res.code === 200) {
+            agents.value = res.data || []
+            agentOptions.value = agents.value.map(a => ({ label: a.name, value: a.id }))
+        }
+    } catch(e) {
+        message.error("Failed to load agents")
+    }
+}
+
 async function loadSessions(pid) {
   try {
     const res = await ListSessions(pid)
     if (res.code === 200) {
       sessions.value = res.data || []
-      // If route has sessionId, verify it belongs to this project
       if (route.params.sessionId) {
         const sid = parseInt(route.params.sessionId)
         const exists = sessions.value.find(s => s.id === sid)
         if (exists) {
           currentSessionId.value = sid
         } else {
-          // If session not found in this project, clear it
           currentSessionId.value = null
         }
       }
@@ -154,32 +192,35 @@ async function loadSessions(pid) {
 async function handleProjectChange(pid) {
   currentProjectId.value = pid
   currentSessionId.value = null
-  router.push({ name: 'Chat' }) // Clear sessionId param
+  router.push({ name: 'Chat' }) 
   await loadSessions(pid)
 }
 
-async function handleCreateSession() {
-  try {
-    const name = `New Chat ${sessions.value.length + 1}`
-    const res = await CreateSession(currentProjectId.value, name)
-    if (res.code === 200) {
-      await loadSessions(currentProjectId.value)
-      // Select the new session (assuming it's the last one or we need ID from create response... 
-      // Current CreateSession doesn't return ID, we might need to fix backend if we want auto-select.
-      // For now, just reload.)
-    } else {
-      message.error(res.msg)
+async function confirmCreateSession() {
+    if (!newSessionName.value || !selectedAgentId.value) {
+        message.warning("Name and Agent are required")
+        return
     }
-  } catch (e) {
-    message.error('Failed to create session')
-  }
+    try {
+        const res = await CreateSession(currentProjectId.value, newSessionName.value, selectedAgentId.value)
+        if (res.code === 200) {
+            showCreateModal.value = false
+            newSessionName.value = ''
+            selectedAgentId.value = null
+            await loadSessions(currentProjectId.value)
+        } else {
+            message.error(res.msg)
+        }
+    } catch(e) {
+        message.error("Create failed: " + e)
+    }
 }
+
 
 function handleSelectSession(sid) {
   currentSessionId.value = sid
   router.push({ name: 'Chat', params: { sessionId: sid } })
-  // TODO: Load history messages for this session
-  messages.value = [] // Clear previous messages
+  messages.value = [] // TODO: Load history
 }
 
 async function handleDeleteSession(sid) {
@@ -205,33 +246,83 @@ async function handleDeleteSession(sid) {
   })
 }
 
-function handleSend() {
+function scrollToBottom() {
+    nextTick(() => {
+        if (scrollbarRef.value) {
+            scrollbarRef.value.scrollTo({ top: 99999, behavior: 'smooth' })
+        }
+    })
+}
+
+async function handleSend() {
   if (!inputText.value.trim()) return
   
-  // Add user message
-  messages.value.push({
-    role: 'user',
-    content: inputText.value
-  })
-  
-  const prompt = inputText.value
+  const content = inputText.value
   inputText.value = ''
   
-  // Simulate AI response (Placeholder for next phase)
-  setTimeout(() => {
-    messages.value.push({
-      role: 'assistant',
-      content: `Echo: ${prompt} (AI logic not connected yet)`
-    })
-  }, 500)
+  // Optimistic UI update
+  messages.value.push({ role: 'user', content: content })
+  scrollToBottom()
+  
+  // Placeholder for AI response
+  const aiMsgIndex = messages.value.push({ role: 'assistant', content: '' }) - 1
+  
+  try {
+      const res = await SendMessage(currentSessionId.value, content)
+      if (res.code !== 200) {
+          message.error(res.msg)
+          messages.value[aiMsgIndex].content = "[Error: " + res.msg + "]"
+      }
+  } catch(e) {
+      message.error("Send failed: " + e)
+  }
+}
+
+// SSE Setup
+function initSSE() {
+    eventSource = new EventSource('http://localhost:8080/events')
+    eventSource.onmessage = (event) => {
+        try {
+            const data = JSON.parse(event.data)
+            // Filter by current session
+            if (data.sessionId === currentSessionId.value) {
+                if (data.delta) {
+                    // Find last assistant message and append
+                    // Ideally we should have message ID, but for now assuming last message is the one streaming
+                    const lastMsg = messages.value[messages.value.length - 1]
+                    if (lastMsg && lastMsg.role === 'assistant') {
+                        lastMsg.content += data.delta
+                    } else {
+                        // If for some reason last msg is not assistant (should not happen with our logic), append new
+                        messages.value.push({ role: 'assistant', content: data.delta })
+                    }
+                    scrollToBottom()
+                }
+                if (data.error) {
+                    message.error("AI Error: " + data.error)
+                }
+            }
+        } catch(e) {
+            console.error("SSE Parse Error", e)
+        }
+    }
 }
 
 onMounted(() => {
   loadProjects()
+  loadAgents()
+  initSSE()
+})
+
+onUnmounted(() => {
+    if (eventSource) {
+        eventSource.close()
+    }
 })
 </script>
 
 <style scoped>
+/* Same styles as before */
 .active-session {
   background-color: rgba(24, 160, 88, 0.1);
   border-radius: 4px;
@@ -260,10 +351,9 @@ onMounted(() => {
   flex: 1;
   padding: 20px;
   overflow: hidden;
-  background-color: #f5f5f5; /* Light bg for contrast */
+  background-color: #f5f5f5; 
 }
 
-/* Dark mode override if needed, but simplistic for now */
 @media (prefers-color-scheme: dark) {
   .messages-container {
     background-color: #101014;
@@ -286,7 +376,7 @@ onMounted(() => {
 }
 
 .message-content {
-  max-width: 70%;
+  max-width: 80%;
 }
 
 .message-bubble {
@@ -295,10 +385,11 @@ onMounted(() => {
   background-color: #fff;
   box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .message-row.user .message-bubble {
-  background-color: #e7f5ee; /* Light green */
+  background-color: #e7f5ee;
   color: #18a058;
 }
 
@@ -317,5 +408,26 @@ onMounted(() => {
   display: flex;
   align-items: flex-end;
   background-color: var(--n-color);
+}
+
+/* Markdown Styles */
+:deep(.markdown-body) {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+:deep(.markdown-body pre) {
+  background-color: #282c34;
+  border-radius: 6px;
+  padding: 12px;
+  overflow: auto;
+  color: #abb2bf;
+}
+:deep(.markdown-body code) {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+}
+:deep(.markdown-body p) {
+  margin-bottom: 8px;
+}
+:deep(.markdown-body p:last-child) {
+  margin-bottom: 0;
 }
 </style>

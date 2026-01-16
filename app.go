@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iat/internal/model"
 	"iat/internal/pkg/common"
+	"iat/internal/pkg/sse"
 	"iat/internal/service"
 )
 
@@ -16,16 +17,18 @@ type App struct {
 	sessionService *service.SessionService
 	scriptService  *service.ScriptService
 	agentService   *service.AgentService
+	chatService    *service.ChatService
 }
 
 // NewApp creates a new App application struct
-func NewApp() *App {
+func NewApp(sseHandler *sse.SSEHandler) *App {
 	return &App{
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
 		sessionService: service.NewSessionService(),
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
+		chatService:    service.NewChatService(sseHandler),
 	}
 }
 
@@ -110,8 +113,8 @@ func (a *App) TestAIModel(m model.AIModel) *common.Result {
 
 // --- Session Methods ---
 
-func (a *App) CreateSession(projectID uint, name string) *common.Result {
-	err := a.sessionService.CreateSession(projectID, name)
+func (a *App) CreateSession(projectID uint, name string, agentID uint) *common.Result {
+	err := a.sessionService.CreateSession(projectID, name, agentID)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
@@ -204,6 +207,16 @@ func (a *App) ListAgents() *common.Result {
 
 func (a *App) DeleteAgent(id uint) *common.Result {
 	err := a.agentService.DeleteAgent(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+// --- Chat Methods ---
+
+func (a *App) SendMessage(sessionID uint, userMessage string) *common.Result {
+	err := a.chatService.Chat(sessionID, userMessage)
 	if err != nil {
 		return common.Fail(err.Error())
 	}

@@ -15,10 +15,11 @@ func NewSessionService() *SessionService {
 	}
 }
 
-func (s *SessionService) CreateSession(projectID uint, name string) error {
+func (s *SessionService) CreateSession(projectID uint, name string, agentID uint) error {
 	session := &model.Session{
 		ProjectID: projectID,
 		Name:      name,
+		AgentID:   agentID,
 	}
 	return s.repo.Create(session)
 }

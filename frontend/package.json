@@ -11,6 +11,8 @@
   "dependencies": {
     "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.13.2",
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.1.0",
     "naive-ui": "^2.43.2",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
