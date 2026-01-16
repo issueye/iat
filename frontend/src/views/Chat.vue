@@ -83,7 +83,52 @@
             style="flex: 1; margin-bottom: 20px; overflow: hidden"
           >
             <template #content="{ item }">
-              <div v-if="!item.isMarkdown">
+              <div v-if="item.role === 'tool'">
+                <div
+                  style="
+                    display: flex;
+                    gap: 8px;
+                    align-items: center;
+                    justify-content: space-between;
+                  "
+                >
+                  <div style="display: flex; gap: 8px; align-items: center">
+                    <span style="font-weight: 600">工具：{{ item.toolName }}</span>
+                    <span v-if="item.toolOk === false" style="color: #d03050"
+                      >失败</span
+                    >
+                    <span v-else-if="item.toolOk === true" style="color: #18a058"
+                      >成功</span
+                    >
+                  </div>
+                  <n-button
+                    size="tiny"
+                    text
+                    @click="item.collapsed = !item.collapsed"
+                  >
+                    {{ item.collapsed ? "展开" : "收起" }}
+                  </n-button>
+                </div>
+                <div v-if="!item.collapsed" style="margin-top: 8px">
+                  <div style="font-size: 12px; color: #999; margin-bottom: 4px">
+                    参数
+                  </div>
+                  <pre class="tool-pre">{{ item.toolArguments }}</pre>
+                  <template v-if="item.toolOutput !== ''">
+                    <div
+                      style="
+                        font-size: 12px;
+                        color: #999;
+                        margin: 8px 0 4px;
+                      "
+                    >
+                      返回
+                    </div>
+                    <pre class="tool-pre">{{ item.toolOutput }}</pre>
+                  </template>
+                </div>
+              </div>
+              <div v-else-if="!item.isMarkdown">
                 {{ item.content }}
               </div>
               <XMarkdown
@@ -116,6 +161,18 @@
             <span style="font-size: 12px; color: #999; margin-left: 8px"
               >(选择此轮对话使用的 Agent)</span
             >
+            <span style="font-size: 12px; color: #999; margin-left: 12px"
+              >累计 Tokens: {{ totalTokenUsage }}</span
+            >
+            <n-button
+              size="small"
+              type="error"
+              secondary
+              style="margin-left: auto"
+              @click="handleClearSession"
+            >
+              清空会话
+            </n-button>
           </div>
 
           <Sender
@@ -151,7 +208,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMessage, useDialog, NIcon } from "naive-ui";
 import { TrashOutline } from "@vicons/ionicons5";
@@ -163,6 +220,7 @@ import {
   ListAgents,
   SendMessage,
   ListMessages,
+  ClearSessionMessages,
 } from "../../wailsjs/go/main/App";
 
 const route = useRoute();
@@ -180,6 +238,12 @@ const currentChatAgentId = ref(null);
 const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
+const totalTokenUsage = computed(() => {
+  return messages.value.reduce((sum, m) => {
+    const n = Number(m?.tokenUsage || 0);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+});
 
 // Create Modal State
 const showCreateModal = ref(false);
@@ -194,12 +258,6 @@ const toolBubbleIndexByCallId = new Map();
 const projectOptions = ref([]);
 const agentOptions = ref([]);
 
-function toFencedCode(text) {
-  const s = text == null ? "" : String(text);
-  const fence = s.includes("```") ? "````" : "```";
-  return `${fence}text\n${s}\n${fence}`;
-}
-
 function handleToolEvent(tool) {
   if (!tool || !tool.stage) return;
 
@@ -207,14 +265,16 @@ function handleToolEvent(tool) {
   const name = tool.name || "unknown";
 
   if (tool.stage === "call") {
-    const content = `**工具调用**：${name}\n\n参数：\n\n${toFencedCode(
-      tool.arguments || ""
-    )}`;
     const idx =
       messages.value.push({
         role: "tool",
-        content,
-        isMarkdown: true,
+        toolName: name,
+        toolArguments: tool.arguments || "",
+        toolOutput: "",
+        toolOk: null,
+        collapsed: true,
+        content: "",
+        isMarkdown: false,
         variant: "outlined",
         shape: "corner",
       }) - 1;
@@ -224,17 +284,21 @@ function handleToolEvent(tool) {
 
   if (tool.stage === "result") {
     const ok = tool.ok !== false;
-    const outputTitle = ok ? "**返回**：" : "**错误**：";
-    const output = `${outputTitle}\n\n${toFencedCode(tool.output || "")}`;
     const idx = toolCallId ? toolBubbleIndexByCallId.get(toolCallId) : null;
     if (idx != null && messages.value[idx]) {
-      messages.value[idx].content += `\n\n${output}`;
+      messages.value[idx].toolOk = ok;
+      messages.value[idx].toolOutput = tool.output || "";
       return;
     }
     messages.value.push({
       role: "tool",
-      content: `**工具调用**：${name}\n\n${output}`,
-      isMarkdown: true,
+      toolName: name,
+      toolArguments: tool.arguments || "",
+      toolOutput: tool.output || "",
+      toolOk: ok,
+      collapsed: true,
+      content: "",
+      isMarkdown: false,
       variant: "outlined",
       shape: "corner",
     });
@@ -360,6 +424,7 @@ async function loadHistory(sid) {
         role: msg.role,
         content: msg.content,
         isMarkdown: msg.role === "assistant",
+        tokenUsage: msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
       }));
       toolBubbleIndexByCallId.clear();
     }
@@ -406,7 +471,7 @@ async function handleSend(payload) {
   inputText.value = "";
 
   // Optimistic UI update
-  messages.value.push({ role: "user", content: content });
+  messages.value.push({ role: "user", content: content, isMarkdown: false });
 
   // Placeholder for AI response
   const aiMsgIndex =
@@ -414,6 +479,7 @@ async function handleSend(payload) {
       role: "assistant",
       content: "",
       isMarkdown: true,
+      tokenUsage: 0,
     }) - 1;
 
   isGenerating.value = true;
@@ -447,28 +513,30 @@ function initSSE() {
         if (data.delta) {
           console.log("data.delta", data.delta);
 
-          // Find last assistant message and append
-          const lastMsg = messages.value[messages.value.length - 1];
-          if (lastMsg && lastMsg.role === "assistant") {
-            lastMsg.content += data.delta;
-          } else {
+          let appended = false;
+          for (let i = messages.value.length - 1; i >= 0; i--) {
+            if (messages.value[i]?.role === "assistant") {
+              messages.value[i].content += data.delta;
+              appended = true;
+              break;
+            }
+          }
+          if (!appended) {
             messages.value.push({
               role: "assistant",
               content: data.delta,
               isMarkdown: true,
+              tokenUsage: 0,
             });
           }
         }
         if (data.usage) {
-          const lastMsg = messages.value[messages.value.length - 1];
-          if (lastMsg && lastMsg.role === "assistant") {
-            // BubbleList items can display footer info?
-            // Currently vue-element-plus-x Bubble might not expose a direct "usage" prop in list mode
-            // but we can append it to content or use custom slot if we were using it.
-            // But we are using BubbleList which iterates list.
-            // We can check if Bubble component supports footer slot in BubbleList.
-            // Yes, we have #footer slot in BubbleList.
-            lastMsg.tokenUsage = data.usage;
+          const usage = Number(data.usage || 0);
+          for (let i = messages.value.length - 1; i >= 0; i--) {
+            if (messages.value[i]?.role === "assistant") {
+              messages.value[i].tokenUsage = Number.isFinite(usage) ? usage : 0;
+              break;
+            }
           }
         }
         if (data.done) {
@@ -483,6 +551,26 @@ function initSSE() {
       console.error("SSE Parse Error", e);
     }
   };
+}
+
+async function handleClearSession() {
+  if (!currentSessionId.value) return;
+  dialog.warning({
+    title: "清空会话内容",
+    content: "将删除该会话所有历史消息，且无法恢复。确定继续？",
+    positiveText: "确认清空",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      const res = await ClearSessionMessages(currentSessionId.value);
+      if (res.code === 200) {
+        messages.value = [];
+        toolBubbleIndexByCallId.clear();
+        isGenerating.value = false;
+      } else {
+        message.error(res.msg || "清空失败");
+      }
+    },
+  });
 }
 
 onMounted(() => {
@@ -513,15 +601,29 @@ onUnmounted(() => {
 }
 .session-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 4px 8px;
+  gap: 8px;
 }
 .session-name {
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+}
+
+.tool-pre {
+  margin: 0;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .empty-state {

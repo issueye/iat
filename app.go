@@ -297,3 +297,10 @@ func (a *App) ListMessages(sessionID uint) *common.Result {
 	}
 	return common.Success(messages)
 }
+
+func (a *App) ClearSessionMessages(sessionID uint) *common.Result {
+	if err := a.chatService.ClearMessages(sessionID); err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}

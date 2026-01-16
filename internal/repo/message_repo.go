@@ -20,3 +20,7 @@ func (r *MessageRepo) ListBySessionID(sessionID uint) ([]model.Message, error) {
 	err := db.DB.Where("session_id = ?", sessionID).Order("created_at asc").Find(&messages).Error
 	return messages, err
 }
+
+func (r *MessageRepo) DeleteBySessionID(sessionID uint) error {
+	return db.DB.Where("session_id = ?", sessionID).Delete(&model.Message{}).Error
+}

@@ -53,6 +53,13 @@ func (s *ChatService) ListMessages(sessionID uint) ([]model.Message, error) {
 	return s.messageRepo.ListBySessionID(sessionID)
 }
 
+func (s *ChatService) ClearMessages(sessionID uint) error {
+	if err := s.messageRepo.DeleteBySessionID(sessionID); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Chat handles the main chat logic
 func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) error {
 	// 1. Get Session
@@ -60,7 +67,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	if err != nil {
 		return fmt.Errorf("session not found: %v", err)
 	}
-	
+
 	projectRoot := ""
 	if session.ProjectID != 0 {
 		project, perr := s.projectRepo.GetByID(session.ProjectID)
@@ -76,7 +83,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	if agentID > 0 {
 		targetAgentID = agentID
 	}
-	
+
 	if targetAgentID == 0 {
 		return fmt.Errorf("session has no agent assigned and no agent selected")
 	}
@@ -120,53 +127,53 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	// 4. Prepare Tools
 	// Get Builtin Tools
 	einoTools := builtin.GetEinoTools(agent.Mode.Key)
-	
+
 	// Get Custom Tools (if any) - assuming agent.Tools is populated (need preload in GetByID)
 	// Currently GetByID preloads Tools, so we are good.
 	// We need to convert agent.Tools to schema.ToolInfo
 	// Note: Custom tool conversion logic is similar to builtin.GetEinoTools
 	// For now, let's assume we just use builtin tools filtered by agent name as requested.
 	// If we want to support custom tools attached to agent, we should iterate agent.Tools.
-	
+
 	// Merge tools
-				// TODO: Implement custom tools conversion if needed. 
-				// Since we are in "optimizing" phase and user emphasized builtin agent roles, 
-				// we stick to builtin.GetEinoTools logic which handles the filtering.
-				// However, if we want to support custom tools (scripts), we should add them here.
-				// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
-				
-				for _, t := range agent.Tools {
-					if t.Type == consts.ToolTypeCustom {
-						var s jsonschema.Schema
-						if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
-							fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
-							continue
-						}
-						einoTools = append(einoTools, &schema.ToolInfo{
-							Name: t.Name,
-							Desc: t.Description,
-							ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
-						})
-					}
-				}
-				// However, if we want to support custom tools (scripts), we should add them here.
-				// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
-				
-				for _, t := range agent.Tools {
-					if t.Type == "custom" {
-						var s jsonschema.Schema
-						if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
-							fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
-							continue
-						}
-						einoTools = append(einoTools, &schema.ToolInfo{
-							Name: t.Name,
-							Desc: t.Description,
-							ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
-						})
-					}
-				}
-	
+	// TODO: Implement custom tools conversion if needed.
+	// Since we are in "optimizing" phase and user emphasized builtin agent roles,
+	// we stick to builtin.GetEinoTools logic which handles the filtering.
+	// However, if we want to support custom tools (scripts), we should add them here.
+	// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
+
+	for _, t := range agent.Tools {
+		if t.Type == consts.ToolTypeCustom {
+			var s jsonschema.Schema
+			if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
+				fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
+				continue
+			}
+			einoTools = append(einoTools, &schema.ToolInfo{
+				Name:        t.Name,
+				Desc:        t.Description,
+				ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
+			})
+		}
+	}
+	// However, if we want to support custom tools (scripts), we should add them here.
+	// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
+
+	for _, t := range agent.Tools {
+		if t.Type == "custom" {
+			var s jsonschema.Schema
+			if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
+				fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
+				continue
+			}
+			einoTools = append(einoTools, &schema.ToolInfo{
+				Name:        t.Name,
+				Desc:        t.Description,
+				ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
+			})
+		}
+	}
+
 	// 5. Init AI Client
 	aiClient, err := ai.NewAIClient(modelConfig, einoTools)
 	if err != nil {
@@ -196,7 +203,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 			Content: agent.SystemPrompt,
 		},
 	}
-	
+
 	for _, msg := range history {
 		role := schema.User
 		if msg.Role == consts.RoleAssistant {
@@ -213,12 +220,12 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	go func() {
 		// Use a loop to handle potential Tool Calls
 		// Max turns to prevent infinite loops
-		maxTurns := 10 
-		
+		maxTurns := 10
+
 		for i := 0; i < maxTurns; i++ {
-			// Create a copy of messages to avoid race conditions if needed, 
+			// Create a copy of messages to avoid race conditions if needed,
 			// but here we are in a single goroutine sequentially updating messages.
-			
+
 			stream, err := aiClient.StreamChat(context.Background(), messages)
 			if err != nil {
 				errMsg, _ := json.Marshal(map[string]interface{}{
@@ -233,7 +240,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 			fullResponse := ""
 			// Map to accumulate tool calls by index
 			toolCallsMap := make(map[int]*schema.ToolCall)
-			
+
 			for {
 				chunk, err := stream.Recv()
 				if err != nil {
@@ -242,7 +249,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					// stream.Recv returns io.EOF when done
 					break
 				}
-				
+
 				// Handle Content
 				if chunk.Content != "" {
 					fullResponse += chunk.Content
@@ -252,7 +259,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					})
 					s.sseHandler.Send(string(msg))
 				}
-				
+
 				// Handle Tool Calls (Accumulate)
 				for _, tc := range chunk.ToolCalls {
 					// Index is usually present in streaming tool calls
@@ -260,7 +267,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					if tc.Index != nil {
 						idx = *tc.Index
 					}
-					
+
 					if _, exists := toolCallsMap[idx]; !exists {
 						toolCallsMap[idx] = &schema.ToolCall{
 							Index: tc.Index,
@@ -272,7 +279,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 							},
 						}
 					}
-					
+
 					// Merge fields
 					if tc.ID != "" {
 						toolCallsMap[idx].ID = tc.ID
@@ -289,7 +296,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				}
 			}
 			stream.Close()
-			
+
 			// Convert map back to slice
 			var toolCalls []schema.ToolCall
 			for idx := 0; idx < len(toolCallsMap); idx++ {
@@ -297,22 +304,28 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					toolCalls = append(toolCalls, *tc)
 				}
 			}
-			
+
 			// Save Assistant Message (Content)
 			// Only save if there is content or tool calls
 			if fullResponse != "" || len(toolCalls) > 0 {
 				aiMsg := &model.Message{
-					SessionID:  sessionID,
-					Role:       consts.RoleAssistant,
-					Content:    fullResponse,
+					SessionID: sessionID,
+					Role:      consts.RoleAssistant,
+					Content:   fullResponse,
 				}
-				
+
 				// Calculate real usage
 				// Simple approximation: 1 token ~= 4 chars
 				aiMsg.TokenCount = len(fullResponse) / 4
 
 				s.messageRepo.Create(aiMsg)
-				
+				totalTokens += aiMsg.TokenCount
+				usageMsg, _ := json.Marshal(map[string]interface{}{
+					"sessionId": sessionID,
+					"usage":     aiMsg.TokenCount,
+				})
+				s.sseHandler.Send(string(usageMsg))
+
 				// Append to conversation context for next turn
 				messages = append(messages, &schema.Message{
 					Role:      schema.Assistant,
@@ -344,7 +357,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					"arguments":  fnArgs,
 					"toolCallId": tc.ID,
 				})
-				
+
 				// 2. Parse arguments
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
@@ -356,16 +369,16 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						"output":     fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
 					})
 					messages = append(messages, &schema.Message{
-						Role: schema.Tool,
-						Content: fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+						Role:       schema.Tool,
+						Content:    fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
 						ToolCallID: tc.ID,
 					})
 					continue
 				}
-				
+
 				// 3. Execute
 				resultStr := ""
-				
+
 				switch fnName {
 				case "read_file":
 					path, _ := args["path"].(string)
@@ -474,7 +487,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 							break
 						}
 					}
-					
+
 					if foundTool != nil {
 						// Execute Script
 						engine := script.NewScriptEngineWithBaseDir(projectRoot)
@@ -483,10 +496,10 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						// Simplest: Set 'args' variable and run script.
 						// BUT, usually script tool content IS the function body or a full script.
 						// Let's assume content is the script code.
-						
+
 						// Inject args
 						engine.RegisterTool("args", args)
-						
+
 						// Run script
 						res, err := engine.Run(foundTool.Content)
 						if err != nil {
@@ -498,7 +511,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						resultStr = fmt.Sprintf("Error: Tool function '%s' not found", fnName)
 					}
 				}
-				
+
 				ok := true
 				if strings.HasPrefix(resultStr, "Error:") {
 					ok = false
@@ -518,7 +531,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					ToolCallID: tc.ID,
 				})
 			}
-			
+
 			// Loop continues to send Tool Results back to LLM
 		}
 	}()
