@@ -38,12 +38,12 @@ func (r *AgentRepo) Delete(id uint) error {
 
 func (r *AgentRepo) List() ([]model.Agent, error) {
 	var agents []model.Agent
-	err := db.DB.Preload("Model").Preload("Tools").Find(&agents).Error
+	err := db.DB.Preload("Model").Preload("Tools").Preload("Mode").Find(&agents).Error
 	return agents, err
 }
 
 func (r *AgentRepo) GetByID(id uint) (*model.Agent, error) {
 	var a model.Agent
-	err := db.DB.Preload("Model").Preload("Tools").First(&a, id).Error
+	err := db.DB.Preload("Model").Preload("Tools").Preload("Mode").First(&a, id).Error
 	return &a, err
 }

@@ -5,7 +5,7 @@ import {common} from '../models';
 
 export function CreateAIModel(arg1:model.AIModel):Promise<common.Result>;
 
-export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number,arg5:Array<number>):Promise<common.Result>;
+export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number,arg5:Array<number>,arg6:number):Promise<common.Result>;
 
 export function CreateProject(arg1:string,arg2:string):Promise<common.Result>;
 
@@ -35,6 +35,8 @@ export function ListAgents():Promise<common.Result>;
 
 export function ListMessages(arg1:number):Promise<common.Result>;
 
+export function ListModes():Promise<common.Result>;
+
 export function ListProjects():Promise<common.Result>;
 
 export function ListScripts():Promise<common.Result>;
@@ -49,7 +51,7 @@ export function SendMessage(arg1:number,arg2:string,arg3:number):Promise<common.
 
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
 
-export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:number,arg6:Array<number>):Promise<common.Result>;
+export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:number,arg6:Array<number>,arg7:number):Promise<common.Result>;
 
 export function UpdateProject(arg1:number,arg2:string,arg3:string):Promise<common.Result>;
 

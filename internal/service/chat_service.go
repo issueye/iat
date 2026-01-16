@@ -64,20 +64,20 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 		return fmt.Errorf("agent not found: %v", err)
 	}
 
-	// Permission Check based on Agent Name/Type
+	// Permission Check based on Agent Mode
 	// Chat: only chat, no tools (implicitly handled if tools are not bound)
 	// Plan: only plan directory operations
 	// Build: all authorized tools
-	if agent.Name == consts.AgentNameChat && agent.Type == consts.AgentTypeBuiltin {
+	if agent.Mode.Key == "chat" {
 		// Chat agent should not execute tools
 		// We can clear tools if they are somehow attached
 		agent.Tools = nil
-	} else if agent.Name == consts.AgentNamePlan && agent.Type == consts.AgentTypeBuiltin {
+	} else if agent.Mode.Key == "plan" {
 		// Plan agent: Ensure system prompt includes instructions to only operate in 'plan' directory
 		// And maybe we can enforce it in tool implementation (but that requires context awareness in tool)
 		// For now, let's append a strict instruction to system prompt
 		agent.SystemPrompt += consts.SystemPromptPlanRestriction
-	} else if agent.Name == consts.AgentNameBuild && agent.Type == consts.AgentTypeBuiltin {
+	} else if agent.Mode.Key == "build" {
 		// Build agent has all permissions.
 	}
 
@@ -89,7 +89,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 
 	// 4. Prepare Tools
 	// Get Builtin Tools
-	einoTools := builtin.GetEinoTools(agent.Name)
+	einoTools := builtin.GetEinoTools(agent.Mode.Key)
 	
 	// Get Custom Tools (if any) - assuming agent.Tools is populated (need preload in GetByID)
 	// Currently GetByID preloads Tools, so we are good.
@@ -328,7 +328,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					switch fnName {
 					case "read_file":
 						path, _ := args["path"].(string)
-						if agent.Name == consts.AgentNamePlan && !strings.Contains(path, "plan") {
+						if agent.Mode.Key == "plan" && !strings.Contains(path, "plan") {
 							// Check restriction
 						}
 						res, err := builtin.ReadFile(path)

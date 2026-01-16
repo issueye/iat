@@ -6,8 +6,8 @@ export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
 
-export function CreateAgent(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5);
+export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function CreateProject(arg1, arg2) {
@@ -66,6 +66,10 @@ export function ListMessages(arg1) {
   return window['go']['main']['App']['ListMessages'](arg1);
 }
 
+export function ListModes() {
+  return window['go']['main']['App']['ListModes']();
+}
+
 export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
@@ -94,8 +98,8 @@ export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
 
-export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function UpdateProject(arg1, arg2, arg3) {

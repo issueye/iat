@@ -19,6 +19,7 @@ type App struct {
 	agentService   *service.AgentService
 	toolService    *service.ToolService
 	chatService    *service.ChatService
+	modeService    *service.ModeService
 }
 
 // NewApp creates a new App application struct
@@ -31,6 +32,7 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		agentService:   service.NewAgentService(),
 		toolService:    service.NewToolService(),
 		chatService:    service.NewChatService(sseHandler),
+		modeService:    service.NewModeService(),
 	}
 }
 
@@ -183,16 +185,16 @@ func (a *App) RunScript(id uint) *common.Result {
 
 // --- Agent Methods ---
 
-func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint) *common.Result {
-	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID, toolIDs)
+func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint, modeID uint) *common.Result {
+	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID, toolIDs, modeID)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
 }
 
-func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint) *common.Result {
-	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID, toolIDs)
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint, modeID uint) *common.Result {
+	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID, toolIDs, modeID)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
@@ -213,6 +215,16 @@ func (a *App) DeleteAgent(id uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
+}
+
+// --- Mode Methods ---
+
+func (a *App) ListModes() *common.Result {
+	modes, err := a.modeService.ListModes()
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(modes)
 }
 
 // --- Tool Methods ---
