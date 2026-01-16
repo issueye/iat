@@ -19,6 +19,14 @@
         />
       </div>
 
+      <div style="margin-bottom: 12px">
+        <n-input
+          v-model:value="sessionSearchQuery"
+          clearable
+          placeholder="按项目名称搜索会话"
+        />
+      </div>
+
       <n-button
         block
         dashed
@@ -32,16 +40,26 @@
       <n-scrollbar>
         <n-list hoverable clickable>
           <n-list-item
-            v-for="session in sessions"
+            v-for="session in displaySessions"
             :key="session.id"
             :class="{ 'active-session': currentSessionId === session.id }"
-            @click="handleSelectSession(session.id)"
+            @click="
+              isSearchingSessions
+                ? handleSelectSearchedSession(session)
+                : handleSelectSession(session.id)
+            "
           >
             <div class="session-item">
               <n-icon v-if="session.compressed" size="16" style="color: #18a058">
                 <ArchiveOutline />
               </n-icon>
-              <span class="session-name">{{ session.name }}</span>
+              <span class="session-name">
+                {{
+                  isSearchingSessions && session.projectName
+                    ? `${session.projectName} / ${session.name}`
+                    : session.name
+                }}
+              </span>
               <n-button
                 size="tiny"
                 text
@@ -56,10 +74,10 @@
           </n-list-item>
         </n-list>
         <div
-          v-if="sessions.length === 0 && currentProjectId"
+          v-if="displaySessions.length === 0 && (currentProjectId || isSearchingSessions)"
           style="text-align: center; color: #666; margin-top: 20px"
         >
-          暂无会话
+          {{ isSearchingSessions ? "未找到会话" : "暂无会话" }}
         </div>
       </n-scrollbar>
     </n-layout-sider>
@@ -247,38 +265,41 @@
       v-model:show="showDetailModal"
       preset="dialog"
       title="会话详情"
-      style="width: 760px"
+      :block-scroll="true"
+      :style="{ width: '760px', maxWidth: 'calc(100vw - 32px)' }"
     >
-      <div v-if="toolInvocations.length === 0" style="color: #999">
-        暂无工具调用记录
-      </div>
-      <n-collapse v-else accordion>
-        <n-collapse-item
-          v-for="it in toolInvocations"
-          :key="it.id"
-          :title="`${it.name}${it.hasResult ? (it.ok ? '（成功）' : '（失败）') : ''}`"
-        >
-          <div style="font-size: 12px; color: #999; margin-bottom: 6px">
-            {{ it.createdAt }}
-          </div>
-          <div style="font-size: 12px; color: #999; margin-bottom: 4px">
-            请求参数
-          </div>
-          <pre class="tool-pre">{{ it.arguments }}</pre>
-          <template v-if="it.hasResult">
-            <div style="font-size: 12px; color: #999; margin: 10px 0 4px">
-              返回结果
+      <div class="session-detail-scroll">
+        <div v-if="toolInvocations.length === 0" style="color: #999">
+          暂无工具调用记录
+        </div>
+        <n-collapse v-else accordion>
+          <n-collapse-item
+            v-for="it in toolInvocations"
+            :key="it.id"
+            :title="`${it.name}${it.hasResult ? (it.ok ? '（成功）' : '（失败）') : ''}`"
+          >
+            <div style="font-size: 12px; color: #999; margin-bottom: 6px">
+              {{ it.createdAt }}
             </div>
-            <pre class="tool-pre">{{ it.output }}</pre>
-          </template>
-        </n-collapse-item>
-      </n-collapse>
+            <div style="font-size: 12px; color: #999; margin-bottom: 4px">
+              请求参数
+            </div>
+            <pre class="tool-pre">{{ it.arguments }}</pre>
+            <template v-if="it.hasResult">
+              <div style="font-size: 12px; color: #999; margin: 10px 0 4px">
+                返回结果
+              </div>
+              <pre class="tool-pre">{{ it.output }}</pre>
+            </template>
+          </n-collapse-item>
+        </n-collapse>
+      </div>
     </n-modal>
   </n-layout>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMessage, useDialog, NIcon } from "naive-ui";
 import {
@@ -299,6 +320,7 @@ import {
   TerminateSession,
   CompressSession,
   ListToolInvocations,
+  SearchSessionsByProjectName,
 } from "../../wailsjs/go/main/App";
 
 const route = useRoute();
@@ -329,6 +351,63 @@ const newSessionName = ref("");
 const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
 const toolInvocations = ref([]);
+const sessionSearchQuery = ref("");
+const searchedSessions = ref([]);
+const searchingSessions = ref(false);
+
+const isSearchingSessions = computed(() => {
+  return String(sessionSearchQuery.value || "").trim() !== "";
+});
+
+const displaySessions = computed(() => {
+  return isSearchingSessions.value ? searchedSessions.value : sessions.value;
+});
+
+const prevOverflow = {
+  html: "",
+  body: "",
+};
+
+watch(showDetailModal, (visible) => {
+  if (typeof document === "undefined") return;
+  const html = document.documentElement;
+  const body = document.body;
+  if (!html || !body) return;
+
+  if (visible) {
+    prevOverflow.html = html.style.overflow;
+    prevOverflow.body = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+  } else {
+    html.style.overflow = prevOverflow.html;
+    body.style.overflow = prevOverflow.body;
+  }
+});
+
+let sessionSearchTimer = null;
+watch(sessionSearchQuery, (q) => {
+  if (sessionSearchTimer) clearTimeout(sessionSearchTimer);
+  const query = String(q || "").trim();
+  if (query === "") {
+    searchedSessions.value = [];
+    searchingSessions.value = false;
+    return;
+  }
+  sessionSearchTimer = setTimeout(async () => {
+    searchingSessions.value = true;
+    try {
+      const res = await SearchSessionsByProjectName(query);
+      if (res.code === 200) {
+        searchedSessions.value = res.data || [];
+      } else {
+        searchedSessions.value = [];
+      }
+    } finally {
+      searchingSessions.value = false;
+    }
+  }, 250);
+});
 
 const userAvatar = `data:image/svg+xml;utf8,${encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
@@ -584,6 +663,15 @@ function handleSelectSession(sid) {
   toolBubbleIndexByCallId.clear();
 }
 
+async function handleSelectSearchedSession(session) {
+  const pid = session.projectId;
+  if (!pid) return;
+  sessionSearchQuery.value = "";
+  searchedSessions.value = [];
+  await handleProjectChange(pid);
+  handleSelectSession(session.id);
+}
+
 async function handleDeleteSession(sid) {
   dialog.warning({
     title: "删除会话",
@@ -599,6 +687,13 @@ async function handleDeleteSession(sid) {
             router.push({ name: "Chat" });
           }
           await loadSessions(currentProjectId.value);
+          if (isSearchingSessions.value) {
+            const q = String(sessionSearchQuery.value || "").trim();
+            if (q) {
+              const sres = await SearchSessionsByProjectName(q);
+              if (sres.code === 200) searchedSessions.value = sres.data || [];
+            }
+          }
         }
       } catch (e) {
         message.error("删除失败");
@@ -805,11 +900,16 @@ onUnmounted(() => {
   if (eventSource) {
     eventSource.close();
   }
+  if (typeof document !== "undefined") {
+    document.documentElement.style.overflow = prevOverflow.html;
+    document.body.style.overflow = prevOverflow.body;
+  }
 });
 </script>
 
 <style scoped>
 :deep(.el-bubble-content) {
+  width: 100%;
   --bubble-content-max-width: 100% !important;
 }
 
@@ -846,6 +946,11 @@ onUnmounted(() => {
     "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
   line-height: 1.5;
+}
+
+.session-detail-scroll {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
 }
 
 .empty-state {

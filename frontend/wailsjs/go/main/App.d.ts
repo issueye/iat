@@ -35,6 +35,10 @@ export function GetScriptAPIDocs():Promise<common.Result>;
 
 export function Greet(arg1:string):Promise<string>;
 
+export function IndexAllProjects():Promise<common.Result>;
+
+export function IndexProject(arg1:number):Promise<common.Result>;
+
 export function ListAIModels():Promise<common.Result>;
 
 export function ListAgents():Promise<common.Result>;
@@ -54,6 +58,8 @@ export function ListToolInvocations(arg1:number):Promise<common.Result>;
 export function ListTools():Promise<common.Result>;
 
 export function RunScript(arg1:number):Promise<common.Result>;
+
+export function SearchSessionsByProjectName(arg1:string):Promise<common.Result>;
 
 export function SelectDirectory():Promise<common.Result>;
 

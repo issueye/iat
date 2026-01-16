@@ -2,9 +2,14 @@
   <div>
     <n-space justify="space-between" align="center" style="margin-bottom: 16px">
       <n-h2 style="margin: 0">项目列表</n-h2>
-      <n-button type="primary" @click="showCreateModal = true">
-        新建项目
-      </n-button>
+      <n-space>
+        <n-button secondary @click="handleIndexAll" :loading="indexingAll">
+          索引全部
+        </n-button>
+        <n-button type="primary" @click="showCreateModal = true">
+          新建项目
+        </n-button>
+      </n-space>
     </n-space>
 
     <n-data-table
@@ -63,6 +68,8 @@ import {
   CreateProject,
   UpdateProject,
   DeleteProject,
+  IndexProject,
+  IndexAllProjects,
   SelectDirectory,
 } from "../../wailsjs/go/main/App";
 
@@ -73,6 +80,8 @@ const projects = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
 const submitting = ref(false);
+const indexingAll = ref(false);
+const indexingProjectId = ref(null);
 const isEdit = ref(false);
 const editingId = ref(null);
 
@@ -133,11 +142,21 @@ const columns = [
   {
     title: "操作",
     key: "actions",
-    width: 150,
+    width: 220,
     fixed: "right",
     render(row) {
       return h(NSpace, null, {
         default: () => [
+          h(
+            NButton,
+            {
+              size: "small",
+              secondary: true,
+              loading: indexingProjectId.value === row.id,
+              onClick: () => handleIndex(row),
+            },
+            { default: () => "索引" }
+          ),
           h(
             NButton,
             {
@@ -174,6 +193,38 @@ async function loadProjects() {
     message.error("加载项目失败: " + e);
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleIndex(row) {
+  indexingProjectId.value = row.id;
+  try {
+    const res = await IndexProject(row.id);
+    if (res.code === 200) {
+      message.success("索引完成");
+    } else {
+      message.error(res.msg || "索引失败");
+    }
+  } catch (e) {
+    message.error("索引失败: " + e);
+  } finally {
+    indexingProjectId.value = null;
+  }
+}
+
+async function handleIndexAll() {
+  indexingAll.value = true;
+  try {
+    const res = await IndexAllProjects();
+    if (res.code === 200) {
+      message.success("索引完成");
+    } else {
+      message.error(res.msg || "索引失败");
+    }
+  } catch (e) {
+    message.error("索引失败: " + e);
+  } finally {
+    indexingAll.value = false;
   }
 }
 

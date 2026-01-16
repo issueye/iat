@@ -219,4 +219,23 @@ var BuiltinTools = []model.Tool{
 			"required": ["url", "body"]
 		}`,
 	},
+	{
+		Name:        "index_project",
+		Description: "Index projects for searching sessions by project name",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "IndexProject",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"projectId": {
+					"type": "number",
+					"description": "Project ID to index (default: current session project)"
+				},
+				"all": {
+					"type": "boolean",
+					"description": "Index all projects"
+				}
+			}
+		}`,
+	},
 }

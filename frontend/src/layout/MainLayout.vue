@@ -99,14 +99,6 @@ const menuOptions = [
     onClick: () => router.push({ name: "Tools" }),
   },
   {
-    label: "脚本API文档",
-    key: "ScriptDocs",
-    icon: renderIcon(CodeIcon),
-    onClick: () => {
-      showScriptDocs.value = !showScriptDocs.value;
-    },
-  },
-  {
     label: "模式管理",
     key: "Modes",
     icon: renderIcon(ModeIcon),
@@ -117,6 +109,14 @@ const menuOptions = [
     key: "Chat",
     icon: renderIcon(ChatIcon),
     onClick: () => router.push({ name: "Chat" }),
+  },
+  {
+    label: "脚本API文档",
+    key: "ScriptDocs",
+    icon: renderIcon(CodeIcon),
+    onClick: () => {
+      showScriptDocs.value = !showScriptDocs.value;
+    },
   },
 ];
 

@@ -187,10 +187,12 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	}
 
 	projectRoot := ""
+	var project *model.Project
 	if session.ProjectID != 0 {
-		project, perr := s.projectRepo.GetByID(session.ProjectID)
+		p, perr := s.projectRepo.GetByID(session.ProjectID)
 		if perr == nil {
-			projectRoot = project.Path
+			project = p
+			projectRoot = p.Path
 		}
 	}
 
@@ -628,6 +630,37 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						resultStr = fmt.Sprintf("Error: %v", err)
 					} else {
 						resultStr = res
+					}
+				case "index_project":
+					all, _ := args["all"].(bool)
+					pid := uint(0)
+					if pv, ok := args["projectId"].(float64); ok && pv > 0 {
+						pid = uint(pv)
+					}
+					if !all && pid == 0 {
+						if project != nil {
+							pid = project.ID
+						} else {
+							pid = session.ProjectID
+						}
+					}
+					indexSvc := NewIndexService()
+					if all {
+						if err := indexSvc.IndexAllProjects(); err != nil {
+							resultStr = fmt.Sprintf("Error: %v", err)
+						} else {
+							resultStr = "success"
+						}
+						break
+					}
+					if pid == 0 {
+						resultStr = "Error: projectId is required"
+						break
+					}
+					if err := indexSvc.IndexProject(pid); err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = "success"
 					}
 				default:
 					// Check if it's a script tool

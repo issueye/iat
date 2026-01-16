@@ -34,3 +34,12 @@ func (r *ProjectRepo) List() ([]model.Project, error) {
 	err := db.DB.Find(&projects).Error
 	return projects, err
 }
+
+func (r *ProjectRepo) ListByIDs(ids []uint) ([]model.Project, error) {
+	var projects []model.Project
+	if len(ids) == 0 {
+		return projects, nil
+	}
+	err := db.DB.Where("id IN ?", ids).Find(&projects).Error
+	return projects, err
+}

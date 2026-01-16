@@ -66,6 +66,14 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function IndexAllProjects() {
+  return window['go']['main']['App']['IndexAllProjects']();
+}
+
+export function IndexProject(arg1) {
+  return window['go']['main']['App']['IndexProject'](arg1);
+}
+
 export function ListAIModels() {
   return window['go']['main']['App']['ListAIModels']();
 }
@@ -104,6 +112,10 @@ export function ListTools() {
 
 export function RunScript(arg1) {
   return window['go']['main']['App']['RunScript'](arg1);
+}
+
+export function SearchSessionsByProjectName(arg1) {
+  return window['go']['main']['App']['SearchSessionsByProjectName'](arg1);
 }
 
 export function SelectDirectory() {

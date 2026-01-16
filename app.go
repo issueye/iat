@@ -18,6 +18,7 @@ type App struct {
 	projectService *service.ProjectService
 	modelService   *service.AIModelService
 	sessionService *service.SessionService
+	indexService   *service.IndexService
 	scriptService  *service.ScriptService
 	agentService   *service.AgentService
 	toolService    *service.ToolService
@@ -31,6 +32,7 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
 		sessionService: service.NewSessionService(),
+		indexService:   service.NewIndexService(),
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
 		toolService:    service.NewToolService(),
@@ -95,6 +97,20 @@ func (a *App) DeleteProject(id uint) *common.Result {
 	return common.Success(nil)
 }
 
+func (a *App) IndexProject(id uint) *common.Result {
+	if err := a.indexService.IndexProject(id); err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) IndexAllProjects() *common.Result {
+	if err := a.indexService.IndexAllProjects(); err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
 // --- AI Model Methods ---
 
 func (a *App) CreateAIModel(m model.AIModel) *common.Result {
@@ -153,6 +169,14 @@ func (a *App) DeleteSession(id uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
+}
+
+func (a *App) SearchSessionsByProjectName(query string) *common.Result {
+	items, err := a.indexService.SearchSessionsByProjectName(query)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(items)
 }
 
 // --- Script Methods ---

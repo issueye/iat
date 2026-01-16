@@ -29,6 +29,15 @@ func (r *SessionRepo) ListByProjectID(projectID uint) ([]model.Session, error) {
 	return sessions, err
 }
 
+func (r *SessionRepo) ListByProjectIDs(projectIDs []uint) ([]model.Session, error) {
+	var sessions []model.Session
+	if len(projectIDs) == 0 {
+		return sessions, nil
+	}
+	err := db.DB.Where("project_id IN ?", projectIDs).Find(&sessions).Error
+	return sessions, err
+}
+
 func (r *SessionRepo) GetByID(id uint) (*model.Session, error) {
 	var s model.Session
 	err := db.DB.First(&s, id).Error
