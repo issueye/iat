@@ -44,7 +44,7 @@ func main() {
 	fmt.Println("--- Starting Flow Test ---")
 
 	// 3. Project
-	err := projectService.CreateProject("Test Project", "Description")
+	err := projectService.CreateProject("Test Project", "Description", "/tmp/test-project")
 	if err != nil {
 		log.Fatal("CreateProject failed:", err)
 	}

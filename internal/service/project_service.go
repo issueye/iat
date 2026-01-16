@@ -15,21 +15,23 @@ func NewProjectService() *ProjectService {
 	}
 }
 
-func (s *ProjectService) CreateProject(name, description string) error {
+func (s *ProjectService) CreateProject(name, description, path string) error {
 	project := &model.Project{
 		Name:        name,
 		Description: description,
+		Path:        path,
 	}
 	return s.repo.Create(project)
 }
 
-func (s *ProjectService) UpdateProject(id uint, name, description string) error {
+func (s *ProjectService) UpdateProject(id uint, name, description, path string) error {
 	project, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
 	}
 	project.Name = name
 	project.Description = description
+	project.Path = path
 	return s.repo.Update(project)
 }
 

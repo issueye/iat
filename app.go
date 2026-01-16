@@ -49,16 +49,16 @@ func (a *App) Greet(name string) string {
 
 // --- Project Methods ---
 
-func (a *App) CreateProject(name, description string) *common.Result {
-	err := a.projectService.CreateProject(name, description)
+func (a *App) CreateProject(name, description, path string) *common.Result {
+	err := a.projectService.CreateProject(name, description, path)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
 }
 
-func (a *App) UpdateProject(id uint, name, description string) *common.Result {
-	err := a.projectService.UpdateProject(id, name, description)
+func (a *App) UpdateProject(id uint, name, description, path string) *common.Result {
+	err := a.projectService.UpdateProject(id, name, description, path)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
