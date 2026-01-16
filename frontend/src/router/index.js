@@ -26,6 +26,11 @@ const routes = [
                 component: () => import('../views/Scripts.vue')
             },
             {
+                path: 'agents',
+                name: 'Agents',
+                component: () => import('../views/Agents.vue')
+            },
+            {
                 path: 'chat/:sessionId?',
                 name: 'Chat',
                 component: () => import('../views/Chat.vue')

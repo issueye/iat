@@ -15,6 +15,7 @@ type App struct {
 	modelService   *service.AIModelService
 	sessionService *service.SessionService
 	scriptService  *service.ScriptService
+	agentService   *service.AgentService
 }
 
 // NewApp creates a new App application struct
@@ -24,6 +25,7 @@ func NewApp() *App {
 		modelService:   service.NewAIModelService(),
 		sessionService: service.NewSessionService(),
 		scriptService:  service.NewScriptService(),
+		agentService:   service.NewAgentService(),
 	}
 }
 
@@ -172,4 +174,38 @@ func (a *App) RunScript(id uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(res)
+}
+
+// --- Agent Methods ---
+
+func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint) *common.Result {
+	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint) *common.Result {
+	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) ListAgents() *common.Result {
+	agents, err := a.agentService.ListAgents()
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(agents)
+}
+
+func (a *App) DeleteAgent(id uint) *common.Result {
+	err := a.agentService.DeleteAgent(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
 }
