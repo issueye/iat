@@ -12,6 +12,7 @@
       :data="scripts"
       :loading="loading"
       :pagination="pagination"
+      :scroll-x="1000"
     />
 
     <!-- Create/Edit Modal -->
@@ -94,11 +95,17 @@ const pagination = { pageSize: 10 };
 const columns = [
   { title: "ID", key: "id", width: 60 },
   { title: "名称", key: "name", width: 150 },
-  { title: "描述", key: "description" },
+  {
+    title: "描述",
+    key: "description",
+    minWidth: 200,
+    ellipsis: { tooltip: true },
+  },
   {
     title: "操作",
     key: "actions",
     width: 200,
+    fixed: "right",
     render(row) {
       return h(NSpace, null, {
         default: () => [

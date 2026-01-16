@@ -12,6 +12,7 @@
       :data="agents"
       :loading="loading"
       :pagination="pagination"
+      :scroll-x="1000"
     />
 
     <!-- Create/Edit Modal -->
@@ -129,6 +130,8 @@ const columns = [
   {
     title: "描述",
     key: "description",
+    key: "description",
+    minWidth: 200,
     ellipsis: {
       tooltip: true,
     },
@@ -169,6 +172,7 @@ const columns = [
     title: "操作",
     key: "actions",
     width: 150,
+    fixed: "right",
     render(row) {
       return h(NSpace, null, {
         default: () => {

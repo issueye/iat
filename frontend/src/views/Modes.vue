@@ -9,70 +9,75 @@
       :data="modes"
       :loading="loading"
       :pagination="pagination"
+      :scroll-x="1000"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useMessage } from 'naive-ui'
-import { ListModes } from '../../wailsjs/go/main/App'
+import { ref, onMounted } from "vue";
+import { useMessage } from "naive-ui";
+import { ListModes } from "../../wailsjs/go/main/App";
 
-const message = useMessage()
+const message = useMessage();
 
-const modes = ref([])
-const loading = ref(false)
+const modes = ref([]);
+const loading = ref(false);
 
 const pagination = {
-  pageSize: 10
-}
+  pageSize: 10,
+};
 
 const columns = [
   {
-    title: 'ID',
-    key: 'id',
-    width: 80
+    title: "ID",
+    key: "id",
+    width: 80,
   },
   {
-    title: '标识 (Key)',
-    key: 'key',
-    width: 150
+    title: "标识 (Key)",
+    key: "key",
+    width: 150,
   },
   {
-    title: '名称',
-    key: 'name',
-    width: 200
+    title: "名称",
+    key: "name",
+    width: 200,
   },
   {
-    title: '描述',
-    key: 'description'
-  },
-  {
-    title: '系统提示词',
-    key: 'systemPrompt',
+    title: "描述",
+    key: "description",
+    minWidth: 200,
     ellipsis: {
-      tooltip: true
-    }
-  }
-]
+      tooltip: true,
+    },
+  },
+  {
+    title: "系统提示词",
+    key: "systemPrompt",
+    ellipsis: {
+      tooltip: true,
+    },
+  },
+];
 
 async function loadModes() {
-  loading.value = true
+  loading.value = true;
   try {
-    const res = await ListModes()
+    const res = await ListModes();
     if (res.code === 200) {
-      modes.value = res.data || []
+      modes.value = res.data || [];
     } else {
-      message.error(res.msg)
+      message.error(res.msg);
     }
   } catch (e) {
-    message.error('加载模式失败: ' + e)
+    message.error("加载模式失败: " + e);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 onMounted(() => {
-  loadModes()
-})
+  loadModes();
+});
 </script>

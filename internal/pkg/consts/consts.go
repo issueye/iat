@@ -6,9 +6,9 @@ const (
 	AgentTypeCustom  = "custom"
 
 	// Agent Names
-	ModeNameChat  = "Chat"
-	ModeNamePlan  = "Plan"
-	ModeNameBuild = "Build"
+	AgentNameChat  = "Chat"
+	AgentNamePlan  = "Plan"
+	AgentNameBuild = "Build"
 
 	// 产品经理Agent
 	AgentNameProductManager = "product manager"

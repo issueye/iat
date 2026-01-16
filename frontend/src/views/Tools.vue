@@ -12,6 +12,7 @@
       :data="tools"
       :loading="loading"
       :pagination="pagination"
+      :scroll-x="1000"
     />
 
     <!-- Create/Edit Modal -->
@@ -35,7 +36,7 @@
           <n-input v-model:value="formValue.description" placeholder="描述" />
         </n-form-item>
         <n-form-item label="类型" path="type">
-           <n-select
+          <n-select
             v-model:value="formValue.type"
             :options="typeOptions"
             placeholder="选择工具类型"
@@ -50,7 +51,7 @@
           />
         </n-form-item>
         <n-form-item label="参数定义" path="parameters">
-           <n-input
+          <n-input
             v-model:value="formValue.parameters"
             type="textarea"
             :autosize="{ minRows: 3, maxRows: 6 }"
@@ -72,7 +73,20 @@
 
 <script setup>
 import { ref, onMounted, h } from "vue";
-import { NButton, NSpace, useMessage, useDialog, NTag, NInput, NForm, NFormItem, NModal, NSelect, NH2, NDataTable } from "naive-ui";
+import {
+  NButton,
+  NSpace,
+  useMessage,
+  useDialog,
+  NTag,
+  NInput,
+  NForm,
+  NFormItem,
+  NModal,
+  NSelect,
+  NH2,
+  NDataTable,
+} from "naive-ui";
 import {
   ListTools,
   CreateTool,
@@ -99,10 +113,10 @@ const formValue = ref({
 });
 
 const typeOptions = [
-    { label: '脚本 (Script)', value: 'script' },
-    { label: 'API', value: 'api' },
-    { label: '函数 (Function)', value: 'function' }
-]
+  { label: "脚本 (Script)", value: "script" },
+  { label: "API", value: "api" },
+  { label: "函数 (Function)", value: "function" },
+];
 
 const rules = {
   name: { required: true, message: "必填", trigger: "blur" },
@@ -113,19 +127,32 @@ const pagination = { pageSize: 10 };
 
 const columns = [
   { title: "名称", key: "name", width: 150 },
-  { title: "类型", key: "type", width: 100, 
+  {
+    title: "类型",
+    key: "type",
+    width: 100,
     render(row) {
-        const type = row.type === 'builtin' ? 'primary' : 'info';
-        return h(NTag, { type: type, bordered: false }, { default: () => row.type })
-    }
+      const type = row.type === "builtin" ? "primary" : "info";
+      return h(
+        NTag,
+        { type: type, bordered: false },
+        { default: () => row.type }
+      );
+    },
   },
-  { title: "描述", key: "description" },
+  {
+    title: "描述",
+    key: "description",
+    minWidth: 200,
+    ellipsis: { tooltip: true },
+  },
   {
     title: "操作",
     key: "actions",
     width: 150,
+    fixed: "right",
     render(row) {
-      if (row.type === 'builtin') {
+      if (row.type === "builtin") {
         return null;
       }
       return h(NSpace, null, {
@@ -220,10 +247,10 @@ async function handleSubmit() {
   try {
     let res;
     const toolData = {
-        ...formValue.value,
-        id: isEdit.value ? editingId.value : 0
-    }
-    
+      ...formValue.value,
+      id: isEdit.value ? editingId.value : 0,
+    };
+
     if (isEdit.value) {
       res = await UpdateTool(toolData);
     } else {

@@ -352,6 +352,16 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						}
 						res, err := builtin.RunCommand(cmd, cmdArgs)
 						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
+					case "run_script":
+						scriptPath, _ := args["scriptPath"].(string)
+						var scriptArgs []string
+						if argsRaw, ok := args["args"].([]interface{}); ok {
+							for _, a := range argsRaw {
+								scriptArgs = append(scriptArgs, fmt.Sprint(a))
+							}
+						}
+						res, err := builtin.RunScript(scriptPath, scriptArgs)
+						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
 					case "http_get":
 						url, _ := args["url"].(string)
 						res, err := builtin.HttpGet(url)

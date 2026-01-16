@@ -17,6 +17,7 @@ var ToolFunctions = map[string]interface{}{
 	"WriteFile":   WriteFile,
 	"ListFiles":   ListFiles,
 	"RunCommand":  RunCommand,
+	"RunScript":   RunScript,
 	"HttpGet":     HttpGet,
 	"HttpPost":    HttpPost,
 }
@@ -25,17 +26,17 @@ func GetEinoTools(modeKey string) []*schema.ToolInfo {
 	var tools []*schema.ToolInfo
 	for _, t := range BuiltinTools {
 		// Permission Filter based on Agent Name
-		if modeKey == consts.ModeNameChat {
+		if modeKey == "chat" {
 			// Chat agent gets NO tools
 			continue
-		} else if modeKey == consts.ModeNamePlan {
+		} else if modeKey == "plan" {
 			// Plan agent only gets file operations (read/write/list)
 			// We can filter by name or some property. 
 			// Assuming file operations are: read_file, write_file, list_files
 			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" {
 				continue
 			}
-		} else if modeKey == consts.ModeNameBuild {
+		} else if modeKey == "build" {
 			// Build agent gets ALL tools
 		} else {
 			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
@@ -151,6 +152,29 @@ var BuiltinTools = []model.Tool{
 				}
 			},
 			"required": ["command"]
+		}`,
+	},
+	{
+		Name:        "run_script",
+		Description: "Execute a script file (python, js, sh, go)",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "RunScript",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"scriptPath": {
+					"type": "string",
+					"description": "The absolute path to the script file"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"description": "List of arguments for the script"
+				}
+			},
+			"required": ["scriptPath"]
 		}`,
 	},
 

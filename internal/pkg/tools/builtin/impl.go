@@ -56,6 +56,28 @@ func RunCommand(command string, args []string) (string, error) {
 	return string(output), nil
 }
 
+func RunScript(scriptPath string, args []string) (string, error) {
+	// Determine the interpreter based on file extension
+	var cmd *exec.Cmd
+	if strings.HasSuffix(scriptPath, ".py") {
+		cmd = exec.Command("python", append([]string{scriptPath}, args...)...)
+	} else if strings.HasSuffix(scriptPath, ".js") {
+		cmd = exec.Command("node", append([]string{scriptPath}, args...)...)
+	} else if strings.HasSuffix(scriptPath, ".sh") {
+		cmd = exec.Command("bash", append([]string{scriptPath}, args...)...)
+	} else if strings.HasSuffix(scriptPath, ".go") {
+		cmd = exec.Command("go", append([]string{"run", scriptPath}, args...)...)
+	} else {
+		return "", fmt.Errorf("unsupported script type: %s", scriptPath)
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return string(output), fmt.Errorf("script execution failed: %v, output: %s", err, string(output))
+	}
+	return string(output), nil
+}
+
 // --- Network Requests ---
 
 func HttpGet(url string) (string, error) {
