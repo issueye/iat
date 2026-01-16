@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iat/internal/model"
 	"iat/internal/pkg/common"
+	"iat/internal/pkg/script/modules"
 	"iat/internal/pkg/sse"
 	"iat/internal/service"
 
@@ -194,6 +195,11 @@ func (a *App) RunScript(id uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(res)
+}
+
+// GetScriptAPIDocs returns the documentation for the script engine modules
+func (a *App) GetScriptAPIDocs() *common.Result {
+	return common.Success(modules.GetModuleDocs())
 }
 
 // --- Agent Methods ---

@@ -24,6 +24,9 @@
         <router-view />
       </n-layout-content>
     </n-layout>
+
+    <!-- Floating Script Docs Window -->
+    <ScriptDocsFloat :show="showScriptDocs" @close="showScriptDocs = false" />
   </n-layout>
 </template>
 
@@ -39,13 +42,20 @@ import {
   HammerOutline as ToolIcon,
   ChatbubbleOutline as ChatIcon,
   OptionsOutline as ModeIcon,
+  CodeSlashOutline as CodeIcon,
 } from "@vicons/ionicons5";
+import ScriptDocsFloat from "../components/ScriptDocsFloat.vue";
 
 const collapsed = ref(false);
+const showScriptDocs = ref(false);
 const route = useRoute();
 const router = useRouter();
 
-const activeKey = computed(() => route.name);
+const activeKey = computed(() => {
+  // If showing docs and not on a specific route that matches, maybe we don't highlight?
+  // Or just highlight current route. ScriptDocs menu item won't be highlighted unless we set a fake key.
+  return route.name;
+});
 
 const contentStyle = computed(() => {
   return route.name === "Chat"
@@ -87,6 +97,14 @@ const menuOptions = [
     key: "Tools",
     icon: renderIcon(ToolIcon),
     onClick: () => router.push({ name: "Tools" }),
+  },
+  {
+    label: "脚本API文档",
+    key: "ScriptDocs",
+    icon: renderIcon(CodeIcon),
+    onClick: () => {
+      showScriptDocs.value = !showScriptDocs.value;
+    },
   },
   {
     label: "模式管理",

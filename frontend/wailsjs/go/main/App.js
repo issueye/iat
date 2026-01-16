@@ -50,6 +50,10 @@ export function DeleteTool(arg1) {
   return window['go']['main']['App']['DeleteTool'](arg1);
 }
 
+export function GetScriptAPIDocs() {
+  return window['go']['main']['App']['GetScriptAPIDocs']();
+}
+
 export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }

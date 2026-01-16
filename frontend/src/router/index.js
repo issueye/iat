@@ -35,6 +35,7 @@ const routes = [
                 name: 'Modes',
                 component: () => import('../views/Modes.vue')
             },
+            // ScriptDocs route removed as it is now a float window
             {
                 path: 'chat/:sessionId?',
                 name: 'Chat',

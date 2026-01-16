@@ -27,6 +27,8 @@ export function DeleteSession(arg1:number):Promise<common.Result>;
 
 export function DeleteTool(arg1:number):Promise<common.Result>;
 
+export function GetScriptAPIDocs():Promise<common.Result>;
+
 export function Greet(arg1:string):Promise<string>;
 
 export function ListAIModels():Promise<common.Result>;
