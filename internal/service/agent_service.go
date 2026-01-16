@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"iat/internal/model"
 	"iat/internal/repo"
 )
@@ -38,6 +39,13 @@ func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt stri
 }
 
 func (s *AgentService) DeleteAgent(id uint) error {
+	agent, err := s.repo.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if agent.Type == "builtin" {
+		return fmt.Errorf("cannot delete builtin agent")
+	}
 	return s.repo.Delete(id)
 }
 

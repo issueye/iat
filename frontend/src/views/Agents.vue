@@ -100,6 +100,11 @@ const pagination = { pageSize: 10 };
 
 const columns = [
   { title: "名称", key: "name", width: 150 },
+  { title: "类型", key: "type", width: 100, 
+    render(row) {
+        return h(NTag, { type: row.type === 'builtin' ? 'primary' : 'default', bordered: false }, { default: () => row.type })
+    }
+  },
   { title: "描述", key: "description" },
   {
     title: "模型",
@@ -117,18 +122,24 @@ const columns = [
     width: 150,
     render(row) {
       return h(NSpace, null, {
-        default: () => [
-          h(
-            NButton,
-            { size: "small", onClick: () => handleEdit(row) },
-            { default: () => "编辑" }
-          ),
-          h(
-            NButton,
-            { size: "small", type: "error", onClick: () => handleDelete(row) },
-            { default: () => "删除" }
-          ),
-        ],
+        default: () => {
+            const btns = [
+                h(
+                    NButton,
+                    { size: "small", onClick: () => handleEdit(row) },
+                    { default: () => "编辑" }
+                )
+            ];
+            
+            if (row.type !== 'builtin') {
+                btns.push(h(
+                    NButton,
+                    { size: "small", type: "error", onClick: () => handleDelete(row) },
+                    { default: () => "删除" }
+                ));
+            }
+            return btns;
+        },
       });
     },
   },

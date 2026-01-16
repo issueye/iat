@@ -6,6 +6,7 @@ require (
 	github.com/cloudwego/eino v0.7.19
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.7
 	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
+	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/wailsapp/wails/v2 v2.11.0
 	gorm.io/gorm v1.31.1
@@ -22,7 +23,6 @@ require (
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.11 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/eino-contrib/jsonschema v1.0.3 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect

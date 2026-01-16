@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"iat/internal/model"
 	"iat/internal/repo"
 )
@@ -28,5 +29,13 @@ func (s *ToolService) UpdateTool(tool *model.Tool) error {
 }
 
 func (s *ToolService) DeleteTool(id uint) error {
+	// Check if tool is builtin
+	tool, err := s.repo.Get(id)
+	if err != nil {
+		return err
+	}
+	if tool.Type == "builtin" {
+		return fmt.Errorf("cannot delete builtin tool")
+	}
 	return s.repo.Delete(id)
 }
