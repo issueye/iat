@@ -36,7 +36,7 @@ func (s *ChatService) ListMessages(sessionID uint) ([]model.Message, error) {
 }
 
 // Chat handles the main chat logic
-func (s *ChatService) Chat(sessionID uint, userMessage string) error {
+func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) error {
 	// 1. Get Session
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
@@ -44,10 +44,17 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 	}
 
 	// 2. Get Agent
-	if session.AgentID == 0 {
-		return fmt.Errorf("session has no agent assigned")
+	// If agentID is provided (e.g. from toolbar), use it.
+	// Otherwise, use the session's default agent.
+	targetAgentID := session.AgentID
+	if agentID > 0 {
+		targetAgentID = agentID
 	}
-	agent, err := s.agentRepo.GetByID(session.AgentID)
+	
+	if targetAgentID == 0 {
+		return fmt.Errorf("session has no agent assigned and no agent selected")
+	}
+	agent, err := s.agentRepo.GetByID(targetAgentID)
 	if err != nil {
 		return fmt.Errorf("agent not found: %v", err)
 	}

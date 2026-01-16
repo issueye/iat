@@ -103,6 +103,21 @@
               </div>
             </template>
           </BubbleList>
+
+          <div style="display: flex; align-items: center; margin-bottom: 8px">
+            <n-select
+              v-model:value="currentChatAgentId"
+              :options="agentOptions"
+              size="small"
+              style="width: 200px"
+              placeholder="使用默认 Agent"
+              clearable
+            />
+            <span style="font-size: 12px; color: #999; margin-left: 8px"
+              >(选择此轮对话使用的 Agent)</span
+            >
+          </div>
+
           <Sender
             v-model="inputText"
             @submit="handleSend"
@@ -161,6 +176,7 @@ const sessions = ref([]);
 const agents = ref([]);
 const currentProjectId = ref(null);
 const currentSessionId = ref(null);
+const currentChatAgentId = ref(null);
 const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
@@ -207,6 +223,16 @@ async function loadAgents() {
         label: a.name,
         value: a.id,
       }));
+
+      // Default to "Chat" agent if available
+      const chatAgent = agents.value.find(
+        (a) => a.name === "Chat" && a.type === "builtin"
+      );
+      if (chatAgent) {
+        selectedAgentId.value = chatAgent.id;
+      } else if (agents.value.length > 0) {
+        selectedAgentId.value = agents.value[0].id;
+      }
     }
   } catch (e) {
     message.error("加载 Agent 失败");
@@ -255,7 +281,19 @@ async function confirmCreateSession() {
     if (res.code === 200) {
       showCreateModal.value = false;
       newSessionName.value = "";
-      selectedAgentId.value = null;
+
+      // Reset selected agent to default
+      const chatAgent = agents.value.find(
+        (a) => a.name === "Chat" && a.type === "builtin"
+      );
+      if (chatAgent) {
+        selectedAgentId.value = chatAgent.id;
+      } else if (agents.value.length > 0) {
+        selectedAgentId.value = agents.value[0].id;
+      } else {
+        selectedAgentId.value = null;
+      }
+
       await loadSessions(currentProjectId.value);
     } else {
       message.error(res.msg);
@@ -283,6 +321,7 @@ async function loadHistory(sid) {
 
 function handleSelectSession(sid) {
   currentSessionId.value = sid;
+  currentChatAgentId.value = null; // Reset temp agent selection when switching session
   router.push({ name: "Chat", params: { sessionId: sid } });
   loadHistory(sid);
 }
@@ -330,7 +369,9 @@ async function handleSend(payload) {
   isGenerating.value = true;
 
   try {
-    const res = await SendMessage(currentSessionId.value, content);
+    // Pass currentChatAgentId (if selected) or 0 (use session default)
+    const agentId = currentChatAgentId.value || 0;
+    const res = await SendMessage(currentSessionId.value, content, agentId);
     if (res.code !== 200) {
       message.error(res.msg);
       messages.value[aiMsgIndex].content = "[错误: " + res.msg + "]";
