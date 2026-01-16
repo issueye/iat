@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/cloudwego/eino/schema"
+	"github.com/eino-contrib/jsonschema"
 )
 
 type ChatService struct {
@@ -97,9 +98,43 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	// If we want to support custom tools attached to agent, we should iterate agent.Tools.
 	
 	// Merge tools
-	// TODO: Implement custom tools conversion if needed. 
-	// Since we are in "optimizing" phase and user emphasized builtin agent roles, 
-	// we stick to builtin.GetEinoTools logic which handles the filtering.
+				// TODO: Implement custom tools conversion if needed. 
+				// Since we are in "optimizing" phase and user emphasized builtin agent roles, 
+				// we stick to builtin.GetEinoTools logic which handles the filtering.
+				// However, if we want to support custom tools (scripts), we should add them here.
+				// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
+				
+				for _, t := range agent.Tools {
+					if t.Type == "custom" {
+						var s jsonschema.Schema
+						if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
+							fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
+							continue
+						}
+						einoTools = append(einoTools, &schema.ToolInfo{
+							Name: t.Name,
+							Desc: t.Description,
+							ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
+						})
+					}
+				}
+				// However, if we want to support custom tools (scripts), we should add them here.
+				// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
+				
+				for _, t := range agent.Tools {
+					if t.Type == "custom" {
+						var s jsonschema.Schema
+						if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
+							fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
+							continue
+						}
+						einoTools = append(einoTools, &schema.ToolInfo{
+							Name: t.Name,
+							Desc: t.Description,
+							ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
+						})
+					}
+				}
 	
 	// 5. Init AI Client
 	aiClient, err := ai.NewAIClient(modelConfig, einoTools)
@@ -239,8 +274,12 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					SessionID:  sessionID,
 					Role:       "assistant",
 					Content:    fullResponse,
-					TokenCount: totalTokens, // TODO: Calculate real usage
 				}
+				
+				// Calculate real usage
+				// Simple approximation: 1 token ~= 4 chars
+				aiMsg.TokenCount = len(fullResponse) / 4
+
 				s.messageRepo.Create(aiMsg)
 				
 				// Append to conversation context for next turn

@@ -67,7 +67,9 @@ func WrapToolFunction(name string, fn interface{}) func(ctx context.Context, inp
 	// For now, let's keep it simple and just return a placeholder or specific wrappers.
 	
 	// Real implementation would use reflection to map input map to function arguments.
-	return nil
+	return func(ctx context.Context, input map[string]interface{}) (string, error) {
+		return "", fmt.Errorf("WrapToolFunction not implemented for %s", name)
+	}
 }
 
 var BuiltinTools = []model.Tool{
