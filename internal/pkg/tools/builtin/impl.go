@@ -13,6 +13,43 @@ import (
 
 // --- File Operations ---
 
+func ResolvePathInBase(baseDir string, userPath string) (string, error) {
+	if strings.TrimSpace(userPath) == "" {
+		return "", fmt.Errorf("path is required")
+	}
+
+	if strings.TrimSpace(baseDir) == "" {
+		p, err := filepath.Abs(filepath.Clean(userPath))
+		if err != nil {
+			return "", err
+		}
+		return p, nil
+	}
+
+	baseAbs, err := filepath.Abs(filepath.Clean(baseDir))
+	if err != nil {
+		return "", err
+	}
+
+	candidate := userPath
+	if !filepath.IsAbs(candidate) {
+		candidate = filepath.Join(baseAbs, candidate)
+	}
+	candidateAbs, err := filepath.Abs(filepath.Clean(candidate))
+	if err != nil {
+		return "", err
+	}
+
+	rel, err := filepath.Rel(baseAbs, candidateAbs)
+	if err != nil {
+		return "", fmt.Errorf("path escapes base directory")
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes base directory")
+	}
+	return candidateAbs, nil
+}
+
 func ReadFile(path string) (string, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -22,12 +59,6 @@ func ReadFile(path string) (string, error) {
 }
 
 func WriteFile(path string, content string) (string, error) {
-	dir := filepath.Dir(path)
-	if dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return "", fmt.Errorf("failed to create directory: %v", err)
-		}
-	}
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write file: %v", err)

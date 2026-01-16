@@ -517,18 +517,16 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				// 2. Parse arguments
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
-					errStr := fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err)
 					s.sendToolEvent(sessionID, map[string]interface{}{
 						"stage":      "result",
 						"name":       fnName,
 						"toolCallId": tc.ID,
 						"ok":         false,
-						"output":     errStr,
+						"output":     fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
 					})
-					_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, errStr, false)
 					messages = append(messages, &schema.Message{
 						Role:       schema.Tool,
-						Content:    errStr,
+						Content:    fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
 						ToolCallID: tc.ID,
 					})
 					continue

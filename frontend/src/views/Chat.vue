@@ -143,11 +143,14 @@
               />
             </template>
             <template #footer="{ item }">
-              <div
-                v-if="item.tokenUsage"
-                style="margin-top: 4px; font-size: 12px; color: #999"
-              >
-                Tokens: {{ item.tokenUsage }}
+              <div style="margin-top: 4px; font-size: 12px; color: #999">
+                <span v-if="formatTime(item.createdAt)">{{
+                  formatTime(item.createdAt)
+                }}</span>
+                <span v-if="item.tokenUsage">
+                  {{ formatTime(item.createdAt) ? " · " : "" }}Tokens:
+                  {{ item.tokenUsage }}
+                </span>
               </div>
             </template>
           </BubbleList>
@@ -327,6 +330,56 @@ const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
 const toolInvocations = ref([]);
 
+const userAvatar = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+     <defs>
+       <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+         <stop offset="0" stop-color="#36ad6a"/>
+         <stop offset="1" stop-color="#18a058"/>
+       </linearGradient>
+     </defs>
+     <rect rx="32" ry="32" width="64" height="64" fill="url(#g)"/>
+     <text x="32" y="40" text-anchor="middle" font-size="28" fill="#fff" font-family="Arial, sans-serif">我</text>
+   </svg>`
+)}`;
+
+const aiAvatar = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
+     <defs>
+       <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1">
+         <stop offset="0" stop-color="#2080f0"/>
+         <stop offset="1" stop-color="#1d4ed8"/>
+       </linearGradient>
+     </defs>
+     <rect rx="32" ry="32" width="64" height="64" fill="url(#g2)"/>
+     <text x="32" y="40" text-anchor="middle" font-size="26" fill="#fff" font-family="Arial, sans-serif">AI</text>
+   </svg>`
+)}`;
+
+function formatTime(input) {
+  if (!input) return "";
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return "";
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mi = String(d.getMinutes()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+}
+
+function applyMessageMeta(item) {
+  if (!item) return item;
+  if (item.role === "user") {
+    item.placement = "end";
+    item.avatar = userAvatar;
+  } else {
+    item.placement = "start";
+    item.avatar = aiAvatar;
+  }
+  return item;
+}
+
 // SSE
 let eventSource = null;
 const toolBubbleIndexByCallId = new Map();
@@ -352,6 +405,9 @@ function handleToolEvent(tool) {
         collapsed: true,
         content: "",
         isMarkdown: false,
+          createdAt: new Date().toISOString(),
+          placement: "start",
+          avatar: aiAvatar,
         variant: "outlined",
         shape: "corner",
       }) - 1;
@@ -376,11 +432,15 @@ function handleToolEvent(tool) {
       collapsed: true,
       content: "",
       isMarkdown: false,
+        createdAt: new Date().toISOString(),
+        placement: "start",
+        avatar: aiAvatar,
       variant: "outlined",
       shape: "corner",
     });
   }
 }
+
 
 // Methods
 async function loadProjects() {
@@ -497,12 +557,18 @@ async function loadHistory(sid) {
     const res = await ListMessages(sid);
     if (res.code === 200) {
       const history = res.data || [];
-      messages.value = history.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-        isMarkdown: msg.role === "assistant",
-        tokenUsage: msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
-      }));
+      messages.value = history
+        .filter((m) => String(m?.content || "").trim() !== "")
+        .map((msg) =>
+          applyMessageMeta({
+            role: msg.role,
+            content: msg.content,
+            isMarkdown: msg.role === "assistant",
+            tokenUsage:
+              msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
+            createdAt: msg.createdAt,
+          })
+        );
       toolBubbleIndexByCallId.clear();
     }
   } catch (e) {
@@ -548,7 +614,14 @@ async function handleSend(payload) {
   inputText.value = "";
 
   // Optimistic UI update
-  messages.value.push({ role: "user", content: content, isMarkdown: false });
+  messages.value.push(
+    applyMessageMeta({
+      role: "user",
+      content: content,
+      isMarkdown: false,
+      createdAt: new Date().toISOString(),
+    })
+  );
 
   // Placeholder for AI response
   const aiMsgIndex =
@@ -557,6 +630,9 @@ async function handleSend(payload) {
       content: "",
       isMarkdown: true,
       tokenUsage: 0,
+      createdAt: new Date().toISOString(),
+      placement: "start",
+      avatar: aiAvatar,
     }) - 1;
 
   isGenerating.value = true;
@@ -572,6 +648,12 @@ async function handleSend(payload) {
     }
   } catch (e) {
     message.error("发送失败: " + e);
+    if (
+      messages.value[aiMsgIndex] &&
+      String(messages.value[aiMsgIndex].content || "").trim() === ""
+    ) {
+      messages.value[aiMsgIndex].content = "[错误: 发送失败]";
+    }
     isGenerating.value = false;
   }
 }
@@ -599,12 +681,15 @@ function initSSE() {
             }
           }
           if (!appended) {
-            messages.value.push({
-              role: "assistant",
-              content: data.delta,
-              isMarkdown: true,
-              tokenUsage: 0,
-            });
+            messages.value.push(
+              applyMessageMeta({
+                role: "assistant",
+                content: data.delta,
+                isMarkdown: true,
+                tokenUsage: 0,
+                createdAt: new Date().toISOString(),
+              })
+            );
           }
         }
         if (data.usage) {
@@ -618,13 +703,28 @@ function initSSE() {
         }
         if (data.done) {
           isGenerating.value = false;
+          const last = messages.value[messages.value.length - 1];
+          if (last?.role === "assistant" && String(last.content || "").trim() === "") {
+            messages.value.pop();
+          }
         }
         if (data.terminated) {
           message.warning("已终止生成");
           isGenerating.value = false;
+          const last = messages.value[messages.value.length - 1];
+          if (last?.role === "assistant" && String(last.content || "").trim() === "") {
+            messages.value.pop();
+          }
           return;
         }
         if (data.error) {
+          const last = messages.value[messages.value.length - 1];
+          if (
+            last?.role === "assistant" &&
+            String(last.content || "").trim() === ""
+          ) {
+            last.content = "[错误: " + data.error + "]";
+          }
           message.error("AI 错误: " + data.error);
           isGenerating.value = false;
         }
