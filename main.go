@@ -4,7 +4,9 @@ import (
 	"embed"
 	"iat/internal/pkg/db"
 	"iat/internal/pkg/logger"
+	"iat/internal/pkg/sse"
 	"log"
+	"net/http"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -22,6 +24,16 @@ func main() {
 	if err := db.InitDB(); err != nil {
 		log.Fatal("Failed to init DB:", err)
 	}
+
+	// Init SSE
+	sseHandler := sse.NewSSEHandler()
+	go func() {
+		http.Handle("/events", sseHandler)
+		log.Println("SSE Server started on :8080")
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			log.Fatal("SSE Server failed:", err)
+		}
+	}()
 
 	// Create an instance of the app structure
 	app := NewApp()

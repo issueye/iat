@@ -1,0 +1,32 @@
+package service
+
+import (
+	"iat/internal/model"
+	"iat/internal/repo"
+)
+
+type SessionService struct {
+	repo *repo.SessionRepo
+}
+
+func NewSessionService() *SessionService {
+	return &SessionService{
+		repo: repo.NewSessionRepo(),
+	}
+}
+
+func (s *SessionService) CreateSession(projectID uint, name string) error {
+	session := &model.Session{
+		ProjectID: projectID,
+		Name:      name,
+	}
+	return s.repo.Create(session)
+}
+
+func (s *SessionService) ListSessions(projectID uint) ([]model.Session, error) {
+	return s.repo.ListByProjectID(projectID)
+}
+
+func (s *SessionService) DeleteSession(id uint) error {
+	return s.repo.Delete(id)
+}
