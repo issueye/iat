@@ -383,7 +383,8 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					// For now, let's look up the tool in the agent's tools list.
 					var foundTool *model.Tool
 					for _, t := range agent.Tools {
-						if t.Name == fnName && t.Type == consts.ToolTypeCustom {
+						// Support both "custom" and "script" types for now, as UI sends "script"
+						if t.Name == fnName && (t.Type == consts.ToolTypeCustom || t.Type == consts.ToolTypeScript) {
 							foundTool = &t
 							break
 						}

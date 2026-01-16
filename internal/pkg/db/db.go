@@ -102,6 +102,34 @@ func seedBuiltinTools(db *gorm.DB) {
 			log.Printf("Seeded builtin tool: %s", tool.Name)
 		}
 	}
+
+	// Seed a sample script tool
+	sampleScript := model.Tool{
+		Name:        "calculate_sum",
+		Description: "Calculates the sum of two numbers using a JS script",
+		Type:        consts.ToolTypeScript,
+		Content:     `
+// args is injected by the engine
+var a = args.a;
+var b = args.b;
+// Return result
+a + b;
+`,
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"a": { "type": "number", "description": "First number" },
+				"b": { "type": "number", "description": "Second number" }
+			},
+			"required": ["a", "b"]
+		}`,
+	}
+	var scriptCount int64
+	db.Model(&model.Tool{}).Where("name = ? AND type = ?", sampleScript.Name, consts.ToolTypeScript).Count(&scriptCount)
+	if scriptCount == 0 {
+		db.Create(&sampleScript)
+		log.Printf("Seeded sample script tool: %s", sampleScript.Name)
+	}
 }
 
 func seedBuiltinAgents(db *gorm.DB) {

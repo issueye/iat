@@ -28,6 +28,7 @@ const (
 	// Tool Types
 	ToolTypeBuiltin = "builtin"
 	ToolTypeCustom  = "custom"
+	ToolTypeScript  = "script"
 
 	// Message Roles
 	RoleSystem    = "system"
