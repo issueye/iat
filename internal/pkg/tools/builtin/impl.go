@@ -59,6 +59,12 @@ func ReadFile(path string) (string, error) {
 }
 
 func WriteFile(path string, content string) (string, error) {
+	// Ensure parent directory exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory %s: %v", dir, err)
+	}
+
 	err := os.WriteFile(path, []byte(content), 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to write file: %v", err)
