@@ -63,7 +63,7 @@ export function SearchSessionsByProjectName(arg1:string):Promise<common.Result>;
 
 export function SelectDirectory():Promise<common.Result>;
 
-export function SendMessage(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
+export function SendMessage(arg1:number,arg2:string,arg3:number,arg4:string):Promise<common.Result>;
 
 export function TerminateSession(arg1:number):Promise<common.Result>;
 

@@ -179,7 +179,7 @@ func (s *ChatService) AbortSession(sessionID uint) {
 }
 
 // Chat handles the main chat logic
-func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) error {
+func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, modeKey string) error {
 	// 1. Get Session
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
@@ -213,19 +213,22 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	}
 
 	// Permission Check based on Agent Mode
-	// Chat: only chat, no tools (implicitly handled if tools are not bound)
-	// Plan: only plan directory operations
-	// Build: all authorized tools
-	if agent.Mode.Key == "chat" {
+	// If modeKey is provided, it overrides the agent's default mode.
+	effectiveMode := agent.Mode.Key
+	if modeKey != "" {
+		effectiveMode = modeKey
+	}
+
+	if effectiveMode == "chat" {
 		// Chat agent should not execute tools
 		// We can clear tools if they are somehow attached
 		agent.Tools = nil
-	} else if agent.Mode.Key == "plan" {
+	} else if effectiveMode == "plan" {
 		// Plan agent: Ensure system prompt includes instructions to only operate in 'plan' directory
 		// And maybe we can enforce it in tool implementation (but that requires context awareness in tool)
 		// For now, let's append a strict instruction to system prompt
 		agent.SystemPrompt += consts.SystemPromptPlanRestriction
-	} else if agent.Mode.Key == "build" {
+	} else if effectiveMode == "build" {
 		// Build agent has all permissions.
 	}
 
@@ -246,7 +249,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 
 	// 4. Prepare Tools
 	// Get Builtin Tools
-	einoTools := builtin.GetEinoTools(agent.Mode.Key)
+	einoTools := builtin.GetEinoTools(effectiveMode)
 
 	// Get Custom Tools (if any) - assuming agent.Tools is populated (need preload in GetByID)
 	// Currently GetByID preloads Tools, so we are good.

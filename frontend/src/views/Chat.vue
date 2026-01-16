@@ -383,8 +383,8 @@ const isGenerating = ref(false);
 
 const modeOptions = [
   { label: "对话 (Chat)", value: "chat" },
-  { label: "代码 (Code)", value: "code" },
-  { label: "工具 (Tool)", value: "tool" },
+  { label: "计划 (Plan)", value: "plan" },
+  { label: "构建 (Build)", value: "build" },
 ];
 
 const totalTokenUsage = computed(() => {
@@ -773,7 +773,12 @@ async function handleSend(payload) {
   try {
     // Pass currentChatAgentId (if selected) or 0 (use session default)
     const agentId = currentChatAgentId.value || 0;
-    const res = await SendMessage(currentSessionId.value, content, agentId);
+    const res = await SendMessage(
+      currentSessionId.value,
+      content,
+      agentId,
+      currentChatMode.value
+    );
     if (res.code !== 200) {
       message.error(res.msg);
       messages.value[aiMsgIndex].content = "[错误: " + res.msg + "]";

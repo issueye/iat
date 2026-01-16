@@ -308,8 +308,8 @@ func (a *App) DeleteTool(id uint) *common.Result {
 
 // --- Chat Methods ---
 
-func (a *App) SendMessage(sessionID uint, userMessage string, agentID uint) *common.Result {
-	err := a.chatService.Chat(sessionID, userMessage, agentID)
+func (a *App) SendMessage(sessionID uint, userMessage string, agentID uint, mode string) *common.Result {
+	err := a.chatService.Chat(sessionID, userMessage, agentID, mode)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
