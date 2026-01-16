@@ -7,4 +7,6 @@ type Session struct {
 	Name      string  `json:"name"`
 	AgentID   uint    `json:"agentId"`
 	Agent     Agent   `json:"-"`
+	Compressed bool   `json:"compressed"`
+	Summary    string `json:"summary"`
 }

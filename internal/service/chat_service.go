@@ -12,10 +12,17 @@ import (
 	"iat/internal/pkg/tools/script"
 	"iat/internal/repo"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
 )
+
+type sessionCancel struct {
+	id     uint64
+	cancel context.CancelFunc
+}
 
 type ChatService struct {
 	projectRepo *repo.ProjectRepo
@@ -23,7 +30,11 @@ type ChatService struct {
 	agentRepo   *repo.AgentRepo
 	modelRepo   *repo.AIModelRepo
 	messageRepo *repo.MessageRepo
+	toolRepo    *repo.ToolInvocationRepo
 	sseHandler  *sse.SSEHandler
+	mu          sync.Mutex
+	genCounter  uint64
+	cancelBySID map[uint]sessionCancel
 }
 
 func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
@@ -33,7 +44,9 @@ func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
 		agentRepo:   repo.NewAgentRepo(),
 		modelRepo:   repo.NewAIModelRepo(),
 		messageRepo: repo.NewMessageRepo(),
+		toolRepo:    repo.NewToolInvocationRepo(),
 		sseHandler:  sseHandler,
+		cancelBySID: make(map[uint]sessionCancel),
 	}
 }
 
@@ -54,10 +67,115 @@ func (s *ChatService) ListMessages(sessionID uint) ([]model.Message, error) {
 }
 
 func (s *ChatService) ClearMessages(sessionID uint) error {
+	s.AbortSession(sessionID)
 	if err := s.messageRepo.DeleteBySessionID(sessionID); err != nil {
 		return err
 	}
+	_ = s.toolRepo.DeleteBySessionID(sessionID)
 	return nil
+}
+
+func (s *ChatService) ListToolInvocations(sessionID uint) ([]model.ToolInvocation, error) {
+	return s.toolRepo.ListBySessionID(sessionID)
+}
+
+func (s *ChatService) CompressSession(sessionID uint) error {
+	s.AbortSession(sessionID)
+
+	session, err := s.sessionRepo.GetByID(sessionID)
+	if err != nil {
+		return fmt.Errorf("session not found: %v", err)
+	}
+	history, err := s.messageRepo.ListBySessionID(sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %v", err)
+	}
+
+	maxMsgs := 60
+	start := 0
+	if len(history) > maxMsgs {
+		start = len(history) - maxMsgs
+	}
+	conv := ""
+	for _, msg := range history[start:] {
+		conv += fmt.Sprintf("[%s]\n%s\n\n", msg.Role, msg.Content)
+	}
+
+	summary := strings.TrimSpace(conv)
+	if summary == "" {
+		summary = "（空会话）"
+	} else {
+		if len(summary) > 4000 {
+			summary = summary[len(summary)-4000:]
+		}
+		summary = "（简易压缩）\n\n" + summary
+	}
+
+	if session.AgentID != 0 {
+		agent, aerr := s.agentRepo.GetByID(session.AgentID)
+		if aerr == nil {
+			var modelConfig *model.AIModel
+			if agent.ModelID != 0 {
+				modelConfig, err = s.modelRepo.GetByID(agent.ModelID)
+			} else {
+				modelConfig, err = s.modelRepo.GetDefault()
+			}
+			if err == nil && modelConfig != nil {
+				aiClient, cerr := ai.NewAIClient(modelConfig, nil)
+				if cerr == nil {
+					prompt := []*schema.Message{
+						{
+							Role:    schema.System,
+							Content: "你是一个会话压缩器。请将给定对话压缩为可用于后续继续对话的摘要，要求：1) 保留用户目标/约束/关键决定；2) 列出重要实体/文件/命令；3) 用中文要点输出；4) 不要编造不存在的信息。",
+						},
+						{
+							Role:    schema.User,
+							Content: conv,
+						},
+					}
+					resp, serr := aiClient.Chat(context.Background(), prompt)
+					if serr == nil {
+						if s2 := strings.TrimSpace(resp.Content); s2 != "" {
+							summary = s2
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if err := s.messageRepo.DeleteBySessionID(sessionID); err != nil {
+		return err
+	}
+	_ = s.toolRepo.DeleteBySessionID(sessionID)
+	aiMsg := &model.Message{
+		SessionID:  sessionID,
+		Role:       consts.RoleAssistant,
+		Content:    summary,
+		TokenCount: len(summary) / 4,
+	}
+	if err := s.messageRepo.Create(aiMsg); err != nil {
+		return err
+	}
+
+	session.Compressed = true
+	session.Summary = summary
+	if err := s.sessionRepo.Update(session); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *ChatService) AbortSession(sessionID uint) {
+	s.mu.Lock()
+	entry, ok := s.cancelBySID[sessionID]
+	if ok && entry.cancel != nil {
+		delete(s.cancelBySID, sessionID)
+	}
+	s.mu.Unlock()
+	if ok && entry.cancel != nil {
+		entry.cancel()
+	}
 }
 
 // Chat handles the main chat logic
@@ -218,15 +336,42 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	// 6. Stream Chat
 	// Run in goroutine to not block
 	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		genID := atomic.AddUint64(&s.genCounter, 1)
+		s.mu.Lock()
+		if prev, ok := s.cancelBySID[sessionID]; ok && prev.cancel != nil {
+			prev.cancel()
+		}
+		s.cancelBySID[sessionID] = sessionCancel{id: genID, cancel: cancel}
+		s.mu.Unlock()
+		defer func() {
+			cancel()
+			s.mu.Lock()
+			if cur, ok := s.cancelBySID[sessionID]; ok && cur.id == genID {
+				delete(s.cancelBySID, sessionID)
+			}
+			s.mu.Unlock()
+		}()
+
 		// Use a loop to handle potential Tool Calls
 		// Max turns to prevent infinite loops
 		maxTurns := 10
 
 		for i := 0; i < maxTurns; i++ {
+			if ctx.Err() != nil {
+				termMsg, _ := json.Marshal(map[string]interface{}{
+					"sessionId":  sessionID,
+					"terminated": true,
+					"done":       true,
+					"error":      "terminated",
+				})
+				s.sseHandler.Send(string(termMsg))
+				return
+			}
 			// Create a copy of messages to avoid race conditions if needed,
 			// but here we are in a single goroutine sequentially updating messages.
 
-			stream, err := aiClient.StreamChat(context.Background(), messages)
+			stream, err := aiClient.StreamChat(ctx, messages)
 			if err != nil {
 				errMsg, _ := json.Marshal(map[string]interface{}{
 					"sessionId": sessionID,
@@ -296,6 +441,16 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				}
 			}
 			stream.Close()
+			if ctx.Err() != nil {
+				termMsg, _ := json.Marshal(map[string]interface{}{
+					"sessionId":  sessionID,
+					"terminated": true,
+					"done":       true,
+					"error":      "terminated",
+				})
+				s.sseHandler.Send(string(termMsg))
+				return
+			}
 
 			// Convert map back to slice
 			var toolCalls []schema.ToolCall
@@ -357,20 +512,23 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					"arguments":  fnArgs,
 					"toolCallId": tc.ID,
 				})
+				_ = s.toolRepo.UpsertCall(sessionID, tc.ID, fnName, fnArgs)
 
 				// 2. Parse arguments
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
+					errStr := fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err)
 					s.sendToolEvent(sessionID, map[string]interface{}{
 						"stage":      "result",
 						"name":       fnName,
 						"toolCallId": tc.ID,
 						"ok":         false,
-						"output":     fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+						"output":     errStr,
 					})
+					_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, errStr, false)
 					messages = append(messages, &schema.Message{
 						Role:       schema.Tool,
-						Content:    fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+						Content:    errStr,
 						ToolCallID: tc.ID,
 					})
 					continue
@@ -516,6 +674,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				if strings.HasPrefix(resultStr, "Error:") {
 					ok = false
 				}
+				_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, resultStr, ok)
 				s.sendToolEvent(sessionID, map[string]interface{}{
 					"stage":      "result",
 					"name":       fnName,

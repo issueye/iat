@@ -6,6 +6,10 @@ export function ClearSessionMessages(arg1) {
   return window['go']['main']['App']['ClearSessionMessages'](arg1);
 }
 
+export function CompressSession(arg1) {
+  return window['go']['main']['App']['CompressSession'](arg1);
+}
+
 export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
@@ -90,6 +94,10 @@ export function ListSessions(arg1) {
   return window['go']['main']['App']['ListSessions'](arg1);
 }
 
+export function ListToolInvocations(arg1) {
+  return window['go']['main']['App']['ListToolInvocations'](arg1);
+}
+
 export function ListTools() {
   return window['go']['main']['App']['ListTools']();
 }
@@ -104,6 +112,10 @@ export function SelectDirectory() {
 
 export function SendMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
+}
+
+export function TerminateSession(arg1) {
+  return window['go']['main']['App']['TerminateSession'](arg1);
 }
 
 export function TestAIModel(arg1) {

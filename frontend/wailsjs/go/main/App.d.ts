@@ -5,6 +5,8 @@ import {model} from '../models';
 
 export function ClearSessionMessages(arg1:number):Promise<common.Result>;
 
+export function CompressSession(arg1:number):Promise<common.Result>;
+
 export function CreateAIModel(arg1:model.AIModel):Promise<common.Result>;
 
 export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number,arg5:Array<number>,arg6:number):Promise<common.Result>;
@@ -47,6 +49,8 @@ export function ListScripts():Promise<common.Result>;
 
 export function ListSessions(arg1:number):Promise<common.Result>;
 
+export function ListToolInvocations(arg1:number):Promise<common.Result>;
+
 export function ListTools():Promise<common.Result>;
 
 export function RunScript(arg1:number):Promise<common.Result>;
@@ -54,6 +58,8 @@ export function RunScript(arg1:number):Promise<common.Result>;
 export function SelectDirectory():Promise<common.Result>;
 
 export function SendMessage(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
+
+export function TerminateSession(arg1:number):Promise<common.Result>;
 
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
 

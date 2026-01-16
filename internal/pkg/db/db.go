@@ -36,6 +36,7 @@ func InitDB() error {
 		&model.Project{},
 		&model.Session{},
 		&model.Message{},
+		&model.ToolInvocation{},
 		&model.AIModel{},
 		&model.Script{},
 		&model.Agent{},

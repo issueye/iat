@@ -38,6 +38,9 @@
             @click="handleSelectSession(session.id)"
           >
             <div class="session-item">
+              <n-icon v-if="session.compressed" size="16" style="color: #18a058">
+                <ArchiveOutline />
+              </n-icon>
               <span class="session-name">{{ session.name }}</span>
               <n-button
                 size="tiny"
@@ -166,12 +169,44 @@
             >
             <n-button
               size="small"
-              type="error"
               secondary
               style="margin-left: auto"
+              @click="openSessionDetail"
+            >
+              <template #icon
+                ><n-icon><InformationCircleOutline /></n-icon
+              ></template>
+              详情
+            </n-button>
+            <n-button
+              size="small"
+              secondary
+              style="margin-left: 8px"
+              @click="handleCompressSession"
+            >
+              <template #icon
+                ><n-icon><ContractOutline /></n-icon
+              ></template>
+              压缩
+            </n-button>
+            <n-button
+              size="small"
+              type="error"
+              secondary
+              style="margin-left: 8px"
               @click="handleClearSession"
             >
               清空会话
+            </n-button>
+            <n-button
+              size="small"
+              type="warning"
+              secondary
+              style="margin-left: 8px"
+              :disabled="!isGenerating"
+              @click="handleTerminateSession"
+            >
+              终止生成
             </n-button>
           </div>
 
@@ -204,6 +239,38 @@
         <n-button type="primary" @click="confirmCreateSession">创建</n-button>
       </template>
     </n-modal>
+
+    <n-modal
+      v-model:show="showDetailModal"
+      preset="dialog"
+      title="会话详情"
+      style="width: 760px"
+    >
+      <div v-if="toolInvocations.length === 0" style="color: #999">
+        暂无工具调用记录
+      </div>
+      <n-collapse v-else accordion>
+        <n-collapse-item
+          v-for="it in toolInvocations"
+          :key="it.id"
+          :title="`${it.name}${it.hasResult ? (it.ok ? '（成功）' : '（失败）') : ''}`"
+        >
+          <div style="font-size: 12px; color: #999; margin-bottom: 6px">
+            {{ it.createdAt }}
+          </div>
+          <div style="font-size: 12px; color: #999; margin-bottom: 4px">
+            请求参数
+          </div>
+          <pre class="tool-pre">{{ it.arguments }}</pre>
+          <template v-if="it.hasResult">
+            <div style="font-size: 12px; color: #999; margin: 10px 0 4px">
+              返回结果
+            </div>
+            <pre class="tool-pre">{{ it.output }}</pre>
+          </template>
+        </n-collapse-item>
+      </n-collapse>
+    </n-modal>
   </n-layout>
 </template>
 
@@ -211,7 +278,12 @@
 import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMessage, useDialog, NIcon } from "naive-ui";
-import { TrashOutline } from "@vicons/ionicons5";
+import {
+  TrashOutline,
+  ArchiveOutline,
+  ContractOutline,
+  InformationCircleOutline,
+} from "@vicons/ionicons5";
 import {
   ListProjects,
   ListSessions,
@@ -221,6 +293,9 @@ import {
   SendMessage,
   ListMessages,
   ClearSessionMessages,
+  TerminateSession,
+  CompressSession,
+  ListToolInvocations,
 } from "../../wailsjs/go/main/App";
 
 const route = useRoute();
@@ -249,6 +324,8 @@ const totalTokenUsage = computed(() => {
 const showCreateModal = ref(false);
 const newSessionName = ref("");
 const selectedAgentId = ref(null);
+const showDetailModal = ref(false);
+const toolInvocations = ref([]);
 
 // SSE
 let eventSource = null;
@@ -542,6 +619,11 @@ function initSSE() {
         if (data.done) {
           isGenerating.value = false;
         }
+        if (data.terminated) {
+          message.warning("已终止生成");
+          isGenerating.value = false;
+          return;
+        }
         if (data.error) {
           message.error("AI 错误: " + data.error);
           isGenerating.value = false;
@@ -571,6 +653,46 @@ async function handleClearSession() {
       }
     },
   });
+}
+
+async function handleTerminateSession() {
+  if (!currentSessionId.value || !isGenerating.value) return;
+  const res = await TerminateSession(currentSessionId.value);
+  if (res.code === 200) {
+    isGenerating.value = false;
+  } else {
+    message.error(res.msg || "终止失败");
+  }
+}
+
+async function handleCompressSession() {
+  if (!currentSessionId.value) return;
+  dialog.warning({
+    title: "压缩会话",
+    content: "压缩会话会用摘要替换全部历史消息，以减少上下文长度。确定继续？",
+    positiveText: "确认压缩",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      const res = await CompressSession(currentSessionId.value);
+      if (res.code === 200) {
+        await loadSessions(currentProjectId.value);
+        await loadHistory(currentSessionId.value);
+      } else {
+        message.error(res.msg || "压缩失败");
+      }
+    },
+  });
+}
+
+async function openSessionDetail() {
+  if (!currentSessionId.value) return;
+  showDetailModal.value = true;
+  const res = await ListToolInvocations(currentSessionId.value);
+  if (res.code === 200) {
+    toolInvocations.value = res.data || [];
+  } else {
+    message.error(res.msg || "加载详情失败");
+  }
 }
 
 onMounted(() => {

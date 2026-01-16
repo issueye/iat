@@ -304,3 +304,23 @@ func (a *App) ClearSessionMessages(sessionID uint) *common.Result {
 	}
 	return common.Success(nil)
 }
+
+func (a *App) TerminateSession(sessionID uint) *common.Result {
+	a.chatService.AbortSession(sessionID)
+	return common.Success(nil)
+}
+
+func (a *App) CompressSession(sessionID uint) *common.Result {
+	if err := a.chatService.CompressSession(sessionID); err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) ListToolInvocations(sessionID uint) *common.Result {
+	items, err := a.chatService.ListToolInvocations(sessionID)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(items)
+}
