@@ -1,5 +1,5 @@
 <template>
-  <n-layout has-sider style="height: 100vh">
+  <n-layout has-sider style="height: 100%">
     <n-layout-sider
       bordered
       collapse-mode="width"
@@ -19,8 +19,8 @@
         @update:value="handleUpdateValue"
       />
     </n-layout-sider>
-    <n-layout>
-      <n-layout-content content-style="padding: 24px;">
+    <n-layout style="height: 100%">
+      <n-layout-content :content-style="contentStyle">
         <router-view />
       </n-layout-content>
     </n-layout>
@@ -45,6 +45,12 @@ const route = useRoute();
 const router = useRouter();
 
 const activeKey = computed(() => route.name);
+
+const contentStyle = computed(() => {
+  return route.name === "Chat"
+    ? "padding: 0; height: 100%"
+    : "padding: 24px; min-height: 100%;";
+});
 
 function renderIcon(icon) {
   return () => h(NIcon, null, { default: () => h(icon) });
@@ -93,3 +99,8 @@ function handleUpdateValue(key) {
   // handled by onClick in options
 }
 </script>
+<style scoped>
+:deep(.n-layout) {
+  height: 100%;
+}
+</style>

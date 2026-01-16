@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"iat/internal/pkg/ai"
 	"iat/internal/pkg/sse"
@@ -73,7 +74,11 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 	go func() {
 		stream, err := aiClient.StreamChat(context.Background(), messages)
 		if err != nil {
-			s.sseHandler.Send(fmt.Sprintf(`{"sessionId": %d, "error": "%v"}`, sessionID, err))
+			errMsg, _ := json.Marshal(map[string]interface{}{
+				"sessionId": sessionID,
+				"error":     err.Error(),
+			})
+			s.sseHandler.Send(string(errMsg))
 			return
 		}
 		defer stream.Close()
@@ -87,11 +92,19 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 			// Send chunk to frontend via SSE
 			// Format: JSON with sessionId and content delta
 			if chunk.Content != "" {
-				s.sseHandler.Send(fmt.Sprintf(`{"sessionId": %d, "delta": "%s"}`, sessionID, chunk.Content))
+				msg, _ := json.Marshal(map[string]interface{}{
+					"sessionId": sessionID,
+					"delta":     chunk.Content,
+				})
+				s.sseHandler.Send(string(msg))
 			}
 		}
 		// Send done signal
-		s.sseHandler.Send(fmt.Sprintf(`{"sessionId": %d, "done": true}`, sessionID))
+		doneMsg, _ := json.Marshal(map[string]interface{}{
+			"sessionId": sessionID,
+			"done":      true,
+		})
+		s.sseHandler.Send(string(doneMsg))
 	}()
 
 	return nil

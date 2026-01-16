@@ -6,12 +6,17 @@ const md = new MarkdownIt({
   html: false,
   linkify: true,
   typographer: true,
+  breaks: true,
   highlight: function (str, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
-        return '<pre class="hljs"><code>' +
-               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-               '</code></pre>';
+        const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
+        return `<div class="code-block-wrapper">
+                  <div class="code-block-header">
+                    <span class="code-lang">${lang}</span>
+                  </div>
+                  <pre class="hljs"><code>${highlighted}</code></pre>
+                </div>`;
       } catch (__) {}
     }
 

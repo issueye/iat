@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="padding: 20px">
     <n-space justify="space-between" align="center" style="margin-bottom: 16px">
       <n-h2 style="margin: 0">智能体管理</n-h2>
       <n-button type="primary" @click="showCreateModal = true">
