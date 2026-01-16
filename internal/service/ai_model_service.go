@@ -17,11 +17,27 @@ func NewAIModelService() *AIModelService {
 }
 
 func (s *AIModelService) CreateModel(m *model.AIModel) error {
+	if m.IsDefault {
+		// Unset other defaults
+		if err := s.repo.UnsetDefault(); err != nil {
+			return err
+		}
+	}
 	return s.repo.Create(m)
 }
 
 func (s *AIModelService) UpdateModel(m *model.AIModel) error {
+	if m.IsDefault {
+		// Unset other defaults
+		if err := s.repo.UnsetDefault(); err != nil {
+			return err
+		}
+	}
 	return s.repo.Update(m)
+}
+
+func (s *AIModelService) GetDefaultModel() (*model.AIModel, error) {
+	return s.repo.GetDefault()
 }
 
 func (s *AIModelService) DeleteModel(id uint) error {

@@ -35,7 +35,6 @@ import {
   HomeOutline as HomeIcon,
   ListOutline as ProjectIcon,
   HardwareChipOutline as ModelIcon,
-  CodeSlashOutline as ScriptIcon,
   PeopleOutline as AgentIcon,
   HammerOutline as ToolIcon,
   ChatbubbleOutline as ChatIcon,
@@ -76,12 +75,6 @@ const menuOptions = [
     key: "Models",
     icon: renderIcon(ModelIcon),
     onClick: () => router.push({ name: "Models" }),
-  },
-  {
-    label: "脚本管理",
-    key: "Scripts",
-    icon: renderIcon(ScriptIcon),
-    onClick: () => router.push({ name: "Scripts" }),
   },
   {
     label: "智能体管理",

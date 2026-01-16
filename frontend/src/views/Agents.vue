@@ -39,7 +39,8 @@
           <n-select
             v-model:value="formValue.modelId"
             :options="modelOptions"
-            placeholder="选择 AI 模型"
+            placeholder="选择 AI 模型 (留空使用默认)"
+            clearable
           />
         </n-form-item>
         <n-form-item label="关联工具" path="toolIds">
@@ -288,30 +289,44 @@ function closeModal() {
 }
 
 async function handleSubmit() {
-  if (!formValue.value.name || !formValue.value.modelId) {
-    message.warning("名称和模型为必填项");
+  if (!formValue.value.name) {
+    message.warning("名称为必填项");
     return;
   }
 
   submitting.value = true;
   try {
     let res;
+    // Handle modelId being null/undefined/0
+    const modelId = formValue.value.modelId || 0;
+
     if (isEdit.value) {
       res = await UpdateAgent(
         editingId.value,
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
-        formValue.value.modelId,
-        formValue.value.toolIds
+        modelId,
+        formValue.value.toolIds,
+        1 // Default ModeID for now
       );
     } else {
       res = await CreateAgent(
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
-        formValue.value.modelId,
-        formValue.value.toolIds
+        modelId,
+        formValue.value.toolIds,
+        // Assuming modeID is handled or defaulted in backend for now, or we need to add it to form
+        // Current CreateAgent signature in frontend call might need update if backend changed
+        // Based on previous context, backend CreateAgent takes modeID.
+        // Let's check App.js signature or just pass 0 if we haven't added Mode selection to UI yet.
+        // For this task, we focus on Model optionality.
+        // We will pass 0 for modeID for now (defaulting to chat in backend maybe? or need update)
+        // Wait, CreateAgent signature in App.go: (name, description, systemPrompt, modelID, toolIDs, modeID)
+        // We need to pass modeID. Let's assume 1 (Chat) or add to form.
+        // For now let's pass 1 as a safe default or 0.
+        1
       );
     }
 

@@ -82,9 +82,18 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	}
 
 	// 3. Get Model Config
-	modelConfig, err := s.modelRepo.GetByID(agent.ModelID)
-	if err != nil {
-		return fmt.Errorf("model config not found: %v", err)
+	var modelConfig *model.AIModel
+	if agent.ModelID != 0 {
+		modelConfig, err = s.modelRepo.GetByID(agent.ModelID)
+		if err != nil {
+			return fmt.Errorf("model config not found: %v", err)
+		}
+	} else {
+		// Use default model
+		modelConfig, err = s.modelRepo.GetDefault()
+		if err != nil {
+			return fmt.Errorf("no default model found and agent has no model assigned")
+		}
 	}
 
 	// 4. Prepare Tools

@@ -21,11 +21,6 @@ const routes = [
                 component: () => import('../views/Models.vue')
             },
             {
-                path: 'scripts',
-                name: 'Scripts',
-                component: () => import('../views/Scripts.vue')
-            },
-            {
                 path: 'agents',
                 name: 'Agents',
                 component: () => import('../views/Agents.vue')

@@ -29,6 +29,16 @@ func (r *AIModelRepo) GetByID(id uint) (*model.AIModel, error) {
 	return &m, err
 }
 
+func (r *AIModelRepo) GetDefault() (*model.AIModel, error) {
+	var m model.AIModel
+	err := db.DB.Where("is_default = ?", true).First(&m).Error
+	return &m, err
+}
+
+func (r *AIModelRepo) UnsetDefault() error {
+	return db.DB.Model(&model.AIModel{}).Where("is_default = ?", true).Update("is_default", false).Error
+}
+
 func (r *AIModelRepo) List() ([]model.AIModel, error) {
 	var models []model.AIModel
 	err := db.DB.Find(&models).Error
