@@ -188,10 +188,58 @@ const selectedAgentId = ref(null);
 
 // SSE
 let eventSource = null;
+const toolBubbleIndexByCallId = new Map();
 
 // Computeds
 const projectOptions = ref([]);
 const agentOptions = ref([]);
+
+function toFencedCode(text) {
+  const s = text == null ? "" : String(text);
+  const fence = s.includes("```") ? "````" : "```";
+  return `${fence}text\n${s}\n${fence}`;
+}
+
+function handleToolEvent(tool) {
+  if (!tool || !tool.stage) return;
+
+  const toolCallId = tool.toolCallId || "";
+  const name = tool.name || "unknown";
+
+  if (tool.stage === "call") {
+    const content = `**工具调用**：${name}\n\n参数：\n\n${toFencedCode(
+      tool.arguments || ""
+    )}`;
+    const idx =
+      messages.value.push({
+        role: "tool",
+        content,
+        isMarkdown: true,
+        variant: "outlined",
+        shape: "corner",
+      }) - 1;
+    if (toolCallId) toolBubbleIndexByCallId.set(toolCallId, idx);
+    return;
+  }
+
+  if (tool.stage === "result") {
+    const ok = tool.ok !== false;
+    const outputTitle = ok ? "**返回**：" : "**错误**：";
+    const output = `${outputTitle}\n\n${toFencedCode(tool.output || "")}`;
+    const idx = toolCallId ? toolBubbleIndexByCallId.get(toolCallId) : null;
+    if (idx != null && messages.value[idx]) {
+      messages.value[idx].content += `\n\n${output}`;
+      return;
+    }
+    messages.value.push({
+      role: "tool",
+      content: `**工具调用**：${name}\n\n${output}`,
+      isMarkdown: true,
+      variant: "outlined",
+      shape: "corner",
+    });
+  }
+}
 
 // Methods
 async function loadProjects() {
@@ -313,6 +361,7 @@ async function loadHistory(sid) {
         content: msg.content,
         isMarkdown: msg.role === "assistant",
       }));
+      toolBubbleIndexByCallId.clear();
     }
   } catch (e) {
     message.error("加载历史记录失败");
@@ -324,6 +373,7 @@ function handleSelectSession(sid) {
   currentChatAgentId.value = null; // Reset temp agent selection when switching session
   router.push({ name: "Chat", params: { sessionId: sid } });
   loadHistory(sid);
+  toolBubbleIndexByCallId.clear();
 }
 
 async function handleDeleteSession(sid) {
@@ -391,6 +441,9 @@ function initSSE() {
       const data = JSON.parse(event.data);
       // Filter by current session
       if (data.sessionId === currentSessionId.value) {
+        if (data.tool) {
+          handleToolEvent(data.tool);
+        }
         if (data.delta) {
           console.log("data.delta", data.delta);
 

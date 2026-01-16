@@ -18,6 +18,7 @@ import (
 )
 
 type ChatService struct {
+	projectRepo *repo.ProjectRepo
 	sessionRepo *repo.SessionRepo
 	agentRepo   *repo.AgentRepo
 	modelRepo   *repo.AIModelRepo
@@ -27,12 +28,24 @@ type ChatService struct {
 
 func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
 	return &ChatService{
+		projectRepo: repo.NewProjectRepo(),
 		sessionRepo: repo.NewSessionRepo(),
 		agentRepo:   repo.NewAgentRepo(),
 		modelRepo:   repo.NewAIModelRepo(),
 		messageRepo: repo.NewMessageRepo(),
 		sseHandler:  sseHandler,
 	}
+}
+
+func (s *ChatService) sendToolEvent(sessionID uint, payload map[string]interface{}) {
+	msg, err := json.Marshal(map[string]interface{}{
+		"sessionId": sessionID,
+		"tool":      payload,
+	})
+	if err != nil {
+		return
+	}
+	s.sseHandler.Send(string(msg))
 }
 
 // ListMessages returns history messages for a session
@@ -46,6 +59,14 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
 		return fmt.Errorf("session not found: %v", err)
+	}
+	
+	projectRoot := ""
+	if session.ProjectID != 0 {
+		project, perr := s.projectRepo.GetByID(session.ProjectID)
+		if perr == nil {
+			projectRoot = project.Path
+		}
 	}
 
 	// 2. Get Agent
@@ -317,10 +338,23 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				// 1. Find function
 				fnName := tc.Function.Name
 				fnArgs := tc.Function.Arguments
+				s.sendToolEvent(sessionID, map[string]interface{}{
+					"stage":      "call",
+					"name":       fnName,
+					"arguments":  fnArgs,
+					"toolCallId": tc.ID,
+				})
 				
 				// 2. Parse arguments
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
+					s.sendToolEvent(sessionID, map[string]interface{}{
+						"stage":      "result",
+						"name":       fnName,
+						"toolCallId": tc.ID,
+						"ok":         false,
+						"output":     fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+					})
 					messages = append(messages, &schema.Message{
 						Role: schema.Tool,
 						Content: fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
@@ -332,59 +366,101 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 				// 3. Execute
 				resultStr := ""
 				
-				// Check if it's a builtin tool
-				if _, ok := builtin.ToolFunctions[fnName]; ok {
-					switch fnName {
-					case "read_file":
-						path, _ := args["path"].(string)
-						if agent.Mode.Key == "plan" && !strings.Contains(path, "plan") {
-							// Check restriction
-						}
-						res, err := builtin.ReadFile(path)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "write_file":
-						path, _ := args["path"].(string)
-						content, _ := args["content"].(string)
-						res, err := builtin.WriteFile(path, content)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "list_files":
-						path, _ := args["path"].(string)
-						res, err := builtin.ListFiles(path)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "run_command":
-						cmd, _ := args["command"].(string)
-						var cmdArgs []string
-						if argsRaw, ok := args["args"].([]interface{}); ok {
-							for _, a := range argsRaw {
-								cmdArgs = append(cmdArgs, fmt.Sprint(a))
-							}
-						}
-						res, err := builtin.RunCommand(cmd, cmdArgs)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "run_script":
-						scriptPath, _ := args["scriptPath"].(string)
-						var scriptArgs []string
-						if argsRaw, ok := args["args"].([]interface{}); ok {
-							for _, a := range argsRaw {
-								scriptArgs = append(scriptArgs, fmt.Sprint(a))
-							}
-						}
-						res, err := builtin.RunScript(scriptPath, scriptArgs)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "http_get":
-						url, _ := args["url"].(string)
-						res, err := builtin.HttpGet(url)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					case "http_post":
-						url, _ := args["url"].(string)
-						body, _ := args["body"].(string)
-						ctype, _ := args["contentType"].(string)
-						res, err := builtin.HttpPost(url, ctype, body)
-						if err != nil { resultStr = fmt.Sprintf("Error: %v", err) } else { resultStr = res }
-					default:
-						resultStr = "Error: Builtin function implementation not found"
+				switch fnName {
+				case "read_file":
+					path, _ := args["path"].(string)
+					p, rerr := builtin.ResolvePathInBase(projectRoot, path)
+					if rerr != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr)
+						break
 					}
-				} else {
+					if agent.Mode.Key == "plan" && !strings.Contains(p, "plan") {
+					}
+					res, err := builtin.ReadFile(p)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "write_file":
+					path, _ := args["path"].(string)
+					content, _ := args["content"].(string)
+					p, rerr := builtin.ResolvePathInBase(projectRoot, path)
+					if rerr != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr)
+						break
+					}
+					res, err := builtin.WriteFile(p, content)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "list_files":
+					path, _ := args["path"].(string)
+					p, rerr := builtin.ResolvePathInBase(projectRoot, path)
+					if rerr != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr)
+						break
+					}
+					res, err := builtin.ListFiles(p)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "run_command":
+					cmd, _ := args["command"].(string)
+					var cmdArgs []string
+					if argsRaw, ok := args["args"].([]interface{}); ok {
+						for _, a := range argsRaw {
+							cmdArgs = append(cmdArgs, fmt.Sprint(a))
+						}
+					}
+					res, err := builtin.RunCommand(cmd, cmdArgs)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "run_script":
+					scriptPath, _ := args["scriptPath"].(string)
+					sp, rerr := builtin.ResolvePathInBase(projectRoot, scriptPath)
+					if rerr != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr)
+						break
+					}
+					var scriptArgs []string
+					if argsRaw, ok := args["args"].([]interface{}); ok {
+						for _, a := range argsRaw {
+							scriptArgs = append(scriptArgs, fmt.Sprint(a))
+						}
+					}
+					res, err := builtin.RunScript(sp, scriptArgs)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "http_get":
+					url, _ := args["url"].(string)
+					res, err := builtin.HttpGet(url)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "http_post":
+					url, _ := args["url"].(string)
+					body, _ := args["body"].(string)
+					ctype, _ := args["contentType"].(string)
+					res, err := builtin.HttpPost(url, ctype, body)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				default:
 					// Check if it's a script tool
 					// Currently we don't have a way to know if a tool name belongs to a script tool directly from memory,
 					// unless we loaded them.
@@ -401,7 +477,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					
 					if foundTool != nil {
 						// Execute Script
-						engine := script.NewScriptEngine()
+						engine := script.NewScriptEngineWithBaseDir(projectRoot)
 						// Inject arguments as global variables or call a function wrapper
 						// Better approach: wrap the script content in a function call or set variables and run.
 						// Simplest: Set 'args' variable and run script.
@@ -423,6 +499,18 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					}
 				}
 				
+				ok := true
+				if strings.HasPrefix(resultStr, "Error:") {
+					ok = false
+				}
+				s.sendToolEvent(sessionID, map[string]interface{}{
+					"stage":      "result",
+					"name":       fnName,
+					"toolCallId": tc.ID,
+					"ok":         ok,
+					"output":     resultStr,
+				})
+
 				// 4. Append Tool Message
 				messages = append(messages, &schema.Message{
 					Role:       schema.Tool,
