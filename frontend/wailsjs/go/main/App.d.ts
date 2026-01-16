@@ -24,3 +24,5 @@ export function ListProjects():Promise<common.Result>;
 export function ListSessions(arg1:number):Promise<common.Result>;
 
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
+
+export function UpdateProject(arg1:number,arg2:string,arg3:string):Promise<common.Result>;

@@ -45,3 +45,7 @@ export function ListSessions(arg1) {
 export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
+
+export function UpdateProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3);
+}

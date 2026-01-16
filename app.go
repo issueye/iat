@@ -46,6 +46,14 @@ func (a *App) CreateProject(name, description string) *common.Result {
 	return common.Success(nil)
 }
 
+func (a *App) UpdateProject(id uint, name, description string) *common.Result {
+	err := a.projectService.UpdateProject(id, name, description)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
 func (a *App) ListProjects() *common.Result {
 	projects, err := a.projectService.ListProjects()
 	if err != nil {
