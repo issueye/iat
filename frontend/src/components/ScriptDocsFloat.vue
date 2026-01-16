@@ -2,7 +2,8 @@
   <div
     v-if="show"
     ref="modalRef"
-    class="fixed z-50 bg-white rounded-lg shadow-2xl border border-gray-200 flex flex-col transition-all duration-200 ease-out"
+    class="script-docs-float"
+    :class="{ minimized: isMinimized }"
     :style="{
       left: position.x + 'px',
       top: position.y + 'px',
@@ -12,16 +13,16 @@
   >
     <!-- Header (Draggable) -->
     <div
-      class="flex justify-between items-center px-4 py-2 bg-gray-100 rounded-t-lg cursor-move select-none border-b border-gray-200"
+      class="docs-header"
       @mousedown="startDrag"
     >
-      <div class="flex items-center gap-2">
-        <n-icon size="18" class="text-blue-600">
+      <div class="header-left">
+        <n-icon size="18" class="icon-blue">
           <CodeSlashOutline />
         </n-icon>
-        <span class="font-bold text-gray-700 text-sm">Script API Docs</span>
+        <span class="header-title">Script API Docs</span>
       </div>
-      <div class="flex items-center gap-2" @mousedown.stop>
+      <div class="header-right" @mousedown.stop>
         <!-- Search Button (only when not minimized) -->
         <n-popover v-if="!isMinimized" trigger="click" placement="bottom-end">
           <template #trigger>
@@ -35,7 +36,7 @@
             v-model:value="searchQuery" 
             placeholder="Search API..." 
             size="small" 
-            class="w-48" 
+            class="search-input" 
             autofocus
             clearable
           />
@@ -71,15 +72,15 @@
     </div>
 
     <!-- Content -->
-    <div v-show="!isMinimized" class="flex-1 overflow-hidden flex">
+    <div v-show="!isMinimized" class="docs-body">
       <!-- Sidebar -->
-      <div class="w-1/4 min-w-[120px] bg-gray-50 border-r border-gray-200 overflow-y-auto">
-        <ul class="py-2">
+      <div class="docs-sidebar">
+        <ul class="module-list">
           <li v-for="mod in filteredModules" :key="mod.name">
             <a
               href="#"
-              class="block px-3 py-2 text-xs font-medium text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition truncate"
-              :class="{ 'bg-blue-100 text-blue-700 border-r-2 border-blue-600': activeModule === mod.name }"
+              class="module-link"
+              :class="{ active: activeModule === mod.name }"
               @click.prevent="scrollToModule(mod.name)"
             >
               {{ mod.name }}
@@ -89,57 +90,57 @@
       </div>
 
       <!-- Main Content -->
-      <div id="docs-content" class="flex-1 overflow-y-auto p-4 bg-white scroll-smooth">
-        <div v-if="loading" class="flex justify-center items-center h-full">
+      <div id="docs-content" class="docs-main">
+        <div v-if="loading" class="loading-state">
           <n-spin size="medium" />
         </div>
-        <div v-else-if="error" class="text-red-500 p-4 text-center">
+        <div v-else-if="error" class="error-state">
           {{ error }}
-          <n-button size="small" class="mt-2" @click="refreshDocs">Retry</n-button>
+          <n-button size="small" class="retry-btn" @click="refreshDocs">Retry</n-button>
         </div>
-        <div v-else class="space-y-8">
+        <div v-else class="content-list">
           <div
             v-for="mod in filteredModules"
             :key="mod.name"
             :id="`float-module-${mod.name}`"
-            class="scroll-mt-4"
+            class="module-section"
           >
-            <h3 class="text-lg font-bold text-gray-800 flex items-center border-b pb-2 mb-4 sticky top-0 bg-white/95 backdrop-blur z-10">
-              <span class="text-blue-600 mr-2">#</span>{{ mod.name }}
+            <h3 class="module-title">
+              <span class="hash">#</span>{{ mod.name }}
             </h3>
-            <p class="text-sm text-gray-500 mb-4">{{ mod.desc }}</p>
+            <p class="module-desc">{{ mod.desc }}</p>
             
-            <div class="space-y-6">
-              <div v-for="fn in mod.functions" :key="fn.name" class="group">
-                <div class="flex items-baseline gap-2 mb-1">
-                  <code class="text-sm font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100">
+            <div class="functions-list">
+              <div v-for="fn in mod.functions" :key="fn.name" class="function-item">
+                <div class="function-header">
+                  <code class="function-name">
                     {{ mod.name }}.{{ fn.name }}
                   </code>
-                  <span class="text-xs text-gray-400 font-mono">
+                  <span class="function-args">
                     ({{ fn.params.map(p => p.name).join(', ') }})
                   </span>
                 </div>
-                <p class="text-xs text-gray-600 mb-2 pl-1">{{ fn.desc }}</p>
+                <p class="function-desc">{{ fn.desc }}</p>
                 
-                <div class="pl-3 border-l-2 border-gray-100 ml-1">
-                  <div v-if="fn.params.length > 0" class="mb-2">
-                    <div v-for="param in fn.params" :key="param.name" class="text-xs grid grid-cols-[100px_1fr] gap-2 mb-1">
-                      <div class="font-mono text-gray-500 truncate" :title="param.name">{{ param.name }}</div>
-                      <div class="text-gray-600">
-                        <span class="text-green-600 bg-green-50 px-1 rounded text-[10px] mr-1">{{ param.type }}</span>
+                <div class="function-details">
+                  <div v-if="fn.params.length > 0" class="params-list">
+                    <div v-for="param in fn.params" :key="param.name" class="param-row">
+                      <div class="param-name" :title="param.name">{{ param.name }}</div>
+                      <div class="param-info">
+                        <span class="param-type">{{ param.type }}</span>
                         {{ param.desc }}
                       </div>
                     </div>
                   </div>
-                  <div class="text-xs grid grid-cols-[100px_1fr] gap-2">
-                    <div class="font-mono text-gray-400">Returns</div>
-                    <div class="text-orange-600 font-mono">{{ fn.returns }}</div>
+                  <div class="return-row">
+                    <div class="return-label">Returns</div>
+                    <div class="return-value">{{ fn.returns }}</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-          <div v-if="filteredModules.length === 0" class="text-center text-gray-400 py-8">
+          <div v-if="filteredModules.length === 0" class="empty-state">
             No results found for "{{ searchQuery }}"
           </div>
         </div>
@@ -149,10 +150,10 @@
     <!-- Resize Handle (Bottom Right) -->
     <div
       v-if="!isMinimized && !isMaximized"
-      class="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize z-50 flex items-center justify-center opacity-50 hover:opacity-100"
+      class="resize-handle"
       @mousedown="startResize"
     >
-      <div class="w-2 h-2 border-r-2 border-b-2 border-gray-400"></div>
+      <div class="resize-icon"></div>
     </div>
   </div>
 </template>
@@ -164,9 +165,9 @@ import {
   CodeSlashOutline, 
   CloseOutline, 
   RemoveOutline, 
-  ExpandOutline, // Use ExpandOutline for restore from minimize
-  ResizeOutline, // Use ResizeOutline for maximize
-  ContractOutline, // Use ContractOutline for restore from maximize
+  ExpandOutline,
+  ResizeOutline,
+  ContractOutline,
   SearchOutline 
 } from "@vicons/ionicons5";
 import { GetScriptAPIDocs } from '../../wailsjs/go/main/App';
@@ -254,7 +255,6 @@ const scrollToModule = (name) => {
   const el = document.getElementById(`float-module-${name}`);
   const container = document.getElementById('docs-content');
   if (el && container) {
-    // Simple scroll into view
     el.scrollIntoView({ behavior: 'smooth' });
   }
 };
@@ -262,10 +262,6 @@ const scrollToModule = (name) => {
 // Window Controls
 const toggleMinimize = () => {
   isMinimized.value = !isMinimized.value;
-  // Reset maximized if minimizing
-  if (isMinimized.value) {
-    // Keep width logic in style binding
-  }
 };
 
 const toggleMaximize = () => {
@@ -348,7 +344,293 @@ watch(() => props.show, (newVal) => {
 </script>
 
 <style scoped>
-/* Custom Scrollbar for nicer look */
+.script-docs-float {
+  position: fixed;
+  z-index: 1000;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  transition: box-shadow 0.2s;
+  overflow: hidden;
+  color: #333;
+}
+
+.script-docs-float.minimized {
+  overflow: hidden;
+}
+
+/* Header */
+.docs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  cursor: move;
+  user-select: none;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-blue {
+  color: #2563eb;
+}
+
+.header-title {
+  font-weight: 700;
+  color: #374151;
+  font-size: 14px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-input {
+  width: 180px;
+}
+
+/* Body */
+.docs-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.docs-sidebar {
+  width: 25%;
+  min-width: 120px;
+  background-color: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  overflow-y: auto;
+}
+
+.module-list {
+  padding: 8px 0;
+  list-style: none;
+  margin: 0;
+}
+
+.module-link {
+  display: block;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  text-decoration: none;
+  transition: all 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.module-link:hover {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.module-link.active {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  border-right: 3px solid #2563eb;
+}
+
+/* Main Content */
+.docs-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background-color: white;
+  scroll-behavior: smooth;
+}
+
+.loading-state, .error-state, .empty-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #6b7280;
+  text-align: center;
+}
+
+.error-state {
+  color: #ef4444;
+}
+
+.retry-btn {
+  margin-top: 8px;
+}
+
+/* Module Section */
+.module-section {
+  scroll-margin-top: 16px;
+  margin-bottom: 32px;
+}
+
+.module-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  z-index: 10;
+}
+
+.hash {
+  color: #2563eb;
+  margin-right: 6px;
+}
+
+.module-desc {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 16px;
+}
+
+/* Functions */
+.functions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.function-item {
+  /* group equivalent */
+}
+
+.function-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.function-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7e22ce;
+  background-color: #f3e8ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #f3e8ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.function-args {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.function-desc {
+  font-size: 13px;
+  color: #4b5563;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+
+.function-details {
+  padding-left: 12px;
+  border-left: 2px solid #f3f4f6;
+  margin-left: 4px;
+}
+
+.params-list {
+  margin-bottom: 8px;
+}
+
+.param-row {
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.param-name {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.param-info {
+  color: #4b5563;
+}
+
+.param-type {
+  color: #16a34a;
+  background-color: #dcfce7;
+  padding: 0 4px;
+  border-radius: 2px;
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+.return-row {
+  font-size: 12px;
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 8px;
+}
+
+.return-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  color: #9ca3af;
+}
+
+.return-value {
+  color: #ea580c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Resize Handle */
+.resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.5;
+}
+
+.resize-handle:hover {
+  opacity: 1;
+}
+
+.resize-icon {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid #9ca3af;
+  border-bottom: 2px solid #9ca3af;
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
