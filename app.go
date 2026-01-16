@@ -183,16 +183,16 @@ func (a *App) RunScript(id uint) *common.Result {
 
 // --- Agent Methods ---
 
-func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint) *common.Result {
-	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID)
+func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint) *common.Result {
+	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID, toolIDs)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
 }
 
-func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint) *common.Result {
-	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID)
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint) *common.Result {
+	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID, toolIDs)
 	if err != nil {
 		return common.Fail(err.Error())
 	}

@@ -6,8 +6,8 @@ export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
 
-export function CreateAgent(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4);
+export function CreateAgent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function CreateProject(arg1, arg2) {
@@ -94,8 +94,8 @@ export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
 
-export function UpdateAgent(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5);
+export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function UpdateProject(arg1, arg2, arg3) {

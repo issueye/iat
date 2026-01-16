@@ -8,4 +8,5 @@ type Agent struct {
 	Type         string `json:"type"` // "builtin" or "custom"
 	ModelID      uint   `json:"modelId"`
 	Model        AIModel `json:"-"`
+	Tools        []Tool  `json:"tools" gorm:"many2many:agent_tools;"`
 }

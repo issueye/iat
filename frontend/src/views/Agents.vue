@@ -41,6 +41,14 @@
             placeholder="选择 AI 模型"
           />
         </n-form-item>
+        <n-form-item label="关联工具" path="toolIds">
+          <n-select
+            v-model:value="formValue.toolIds"
+            multiple
+            :options="toolOptions"
+            placeholder="选择工具"
+          />
+        </n-form-item>
         <n-form-item label="系统提示词" path="systemPrompt">
           <n-input
             v-model:value="formValue.systemPrompt"
@@ -71,6 +79,7 @@ import {
   UpdateAgent,
   DeleteAgent,
   ListAIModels,
+  ListTools,
 } from "../../wailsjs/go/main/App";
 
 const message = useMessage();
@@ -78,6 +87,7 @@ const dialog = useDialog();
 
 const agents = ref([]);
 const modelOptions = ref([]);
+const toolOptions = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
 const submitting = ref(false);
@@ -89,6 +99,7 @@ const formValue = ref({
   description: "",
   systemPrompt: "",
   modelId: null,
+  toolIds: [],
 });
 
 const rules = {
@@ -100,10 +111,20 @@ const pagination = { pageSize: 10 };
 
 const columns = [
   { title: "名称", key: "name", width: 150 },
-  { title: "类型", key: "type", width: 100, 
+  {
+    title: "类型",
+    key: "type",
+    width: 100,
     render(row) {
-        return h(NTag, { type: row.type === 'builtin' ? 'primary' : 'default', bordered: false }, { default: () => row.type })
-    }
+      return h(
+        NTag,
+        {
+          type: row.type === "builtin" ? "primary" : "default",
+          bordered: false,
+        },
+        { default: () => row.type }
+      );
+    },
   },
   { title: "描述", key: "description" },
   {
@@ -117,28 +138,56 @@ const columns = [
     },
   },
   {
+    title: "工具",
+    key: "Tools",
+    width: 200,
+    render(row) {
+      if (!row.tools || row.tools.length === 0) return "无";
+      return h(
+        NSpace,
+        { size: 4, style: { flexWrap: "wrap" } },
+        {
+          default: () =>
+            row.tools.map((tool) =>
+              h(
+                NTag,
+                { type: "success", size: "small", bordered: false },
+                { default: () => tool.name }
+              )
+            ),
+        }
+      );
+    },
+  },
+  {
     title: "操作",
     key: "actions",
     width: 150,
     render(row) {
       return h(NSpace, null, {
         default: () => {
-            const btns = [
-                h(
-                    NButton,
-                    { size: "small", onClick: () => handleEdit(row) },
-                    { default: () => "编辑" }
-                )
-            ];
-            
-            if (row.type !== 'builtin') {
-                btns.push(h(
-                    NButton,
-                    { size: "small", type: "error", onClick: () => handleDelete(row) },
-                    { default: () => "删除" }
-                ));
-            }
-            return btns;
+          const btns = [
+            h(
+              NButton,
+              { size: "small", onClick: () => handleEdit(row) },
+              { default: () => "编辑" }
+            ),
+          ];
+
+          if (row.type !== "builtin") {
+            btns.push(
+              h(
+                NButton,
+                {
+                  size: "small",
+                  type: "error",
+                  onClick: () => handleDelete(row),
+                },
+                { default: () => "删除" }
+              )
+            );
+          }
+          return btns;
         },
       });
     },
@@ -148,12 +197,21 @@ const columns = [
 async function loadData() {
   loading.value = true;
   try {
-    // Load Models first for select options
+    // Load Models
     const modelRes = await ListAIModels();
     if (modelRes.code === 200) {
       modelOptions.value = (modelRes.data || []).map((m) => ({
         label: m.name,
         value: m.id,
+      }));
+    }
+
+    // Load Tools
+    const toolRes = await ListTools();
+    if (toolRes.code === 200) {
+      toolOptions.value = (toolRes.data || []).map((t) => ({
+        label: `${t.name} (${t.type})`,
+        value: t.id,
       }));
     }
 
@@ -179,6 +237,7 @@ function handleEdit(row) {
     description: row.description,
     systemPrompt: row.systemPrompt,
     modelId: row.modelId,
+    toolIds: (row.tools || []).map((t) => t.id),
   };
   showCreateModal.value = true;
 }
@@ -212,6 +271,7 @@ function closeModal() {
     description: "",
     systemPrompt: "",
     modelId: null,
+    toolIds: [],
   };
   isEdit.value = false;
   editingId.value = null;
@@ -232,14 +292,16 @@ async function handleSubmit() {
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
-        formValue.value.modelId
+        formValue.value.modelId,
+        formValue.value.toolIds
       );
     } else {
       res = await CreateAgent(
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
-        formValue.value.modelId
+        formValue.value.modelId,
+        formValue.value.toolIds
       );
     }
 

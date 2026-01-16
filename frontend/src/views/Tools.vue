@@ -115,7 +115,8 @@ const columns = [
   { title: "名称", key: "name", width: 150 },
   { title: "类型", key: "type", width: 100, 
     render(row) {
-        return h(NTag, { type: 'info', bordered: false }, { default: () => row.type })
+        const type = row.type === 'builtin' ? 'primary' : 'info';
+        return h(NTag, { type: type, bordered: false }, { default: () => row.type })
     }
   },
   { title: "描述", key: "description" },
@@ -124,6 +125,9 @@ const columns = [
     key: "actions",
     width: 150,
     render(row) {
+      if (row.type === 'builtin') {
+        return null;
+      }
       return h(NSpace, null, {
         default: () => [
           h(

@@ -16,25 +16,39 @@ func NewAgentService() *AgentService {
 	}
 }
 
-func (s *AgentService) CreateAgent(name, description, systemPrompt string, modelID uint) error {
+func (s *AgentService) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint) error {
+	var tools []model.Tool
+	for _, tid := range toolIDs {
+		tools = append(tools, model.Tool{Base: model.Base{ID: tid}})
+	}
+
 	agent := &model.Agent{
 		Name:         name,
 		Description:  description,
 		SystemPrompt: systemPrompt,
 		ModelID:      modelID,
+		Tools:        tools,
 	}
 	return s.repo.Create(agent)
 }
 
-func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint) error {
+func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint) error {
 	agent, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
 	}
+	
+	var tools []model.Tool
+	for _, tid := range toolIDs {
+		tools = append(tools, model.Tool{Base: model.Base{ID: tid}})
+	}
+
 	agent.Name = name
 	agent.Description = description
 	agent.SystemPrompt = systemPrompt
 	agent.ModelID = modelID
+	agent.Tools = tools
+	
 	return s.repo.Update(agent)
 }
 
