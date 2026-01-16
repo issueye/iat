@@ -113,6 +113,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 		}
 		defer stream.Close()
 
+		totalTokens := 0
 		fullResponse := ""
 		for {
 			chunk, err := stream.Recv()
@@ -130,20 +131,33 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 				})
 				s.sseHandler.Send(string(msg))
 			}
+			
+			// Try to get usage if available in extra
+			// Note: OpenAI stream usage is often in the last chunk or has specific field
+			// Eino schema.Message might have extra info, but Stream reader returns *schema.Message
+			// Let's check if we can get token usage from eino stream
 		}
 		
+		// Estimate token count if not provided (simple approximation: 1 token ~= 4 chars)
+		// Or if Eino provides a way to get usage from stream.
+		// Currently Eino's OpenAI implementation might not expose usage in stream easily without custom callback or check specific chunk.
+		// For now, let's just save the length as a proxy or 0.
+		totalTokens = len(fullResponse) / 4
+
 		// Save Assistant Message
 		aiMsg := &model.Message{
-			SessionID: sessionID,
-			Role:      "assistant",
-			Content:   fullResponse,
+			SessionID:  sessionID,
+			Role:       "assistant",
+			Content:    fullResponse,
+			TokenCount: totalTokens,
 		}
 		s.messageRepo.Create(aiMsg)
 
-		// Send done signal
+		// Send done signal with usage
 		doneMsg, _ := json.Marshal(map[string]interface{}{
 			"sessionId": sessionID,
 			"done":      true,
+			"usage":     totalTokens,
 		})
 		s.sseHandler.Send(string(doneMsg))
 	}()

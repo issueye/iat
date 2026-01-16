@@ -91,7 +91,16 @@
                 :markdown="item.content"
                 default-theme-mode="light"
                 style="text-align: left"
+                :enable-code-line-number="true"
               />
+            </template>
+            <template #footer="{ item }">
+              <div
+                v-if="item.tokenUsage"
+                style="margin-top: 4px; font-size: 12px; color: #999"
+              >
+                Tokens: {{ item.tokenUsage }}
+              </div>
             </template>
           </BubbleList>
           <Sender
@@ -354,6 +363,18 @@ function initSSE() {
               content: data.delta,
               isMarkdown: true,
             });
+          }
+        }
+        if (data.usage) {
+          const lastMsg = messages.value[messages.value.length - 1];
+          if (lastMsg && lastMsg.role === "assistant") {
+            // BubbleList items can display footer info?
+            // Currently vue-element-plus-x Bubble might not expose a direct "usage" prop in list mode
+            // but we can append it to content or use custom slot if we were using it.
+            // But we are using BubbleList which iterates list.
+            // We can check if Bubble component supports footer slot in BubbleList.
+            // Yes, we have #footer slot in BubbleList.
+            lastMsg.tokenUsage = data.usage;
           }
         }
         if (data.done) {
