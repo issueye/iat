@@ -36,6 +36,11 @@ const routes = [
                 component: () => import('../views/Tools.vue')
             },
             {
+                path: 'modes',
+                name: 'Modes',
+                component: () => import('../views/Modes.vue')
+            },
+            {
                 path: 'chat/:sessionId?',
                 name: 'Chat',
                 component: () => import('../views/Chat.vue')

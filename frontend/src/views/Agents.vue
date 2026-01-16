@@ -126,7 +126,13 @@ const columns = [
       );
     },
   },
-  { title: "描述", key: "description" },
+  {
+    title: "描述",
+    key: "description",
+    ellipsis: {
+      tooltip: true,
+    },
+  },
   {
     title: "模型",
     key: "Model",

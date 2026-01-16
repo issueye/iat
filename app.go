@@ -7,6 +7,8 @@ import (
 	"iat/internal/pkg/common"
 	"iat/internal/pkg/sse"
 	"iat/internal/service"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -45,6 +47,17 @@ func (a *App) startup(ctx context.Context) {
 // Greet returns a greeting for the given name
 func (a *App) Greet(name string) string {
 	return fmt.Sprintf("Hello %s, It's show time!", name)
+}
+
+// SelectDirectory opens a directory selection dialog
+func (a *App) SelectDirectory() *common.Result {
+	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Select Project Directory",
+	})
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(path)
 }
 
 // --- Project Methods ---

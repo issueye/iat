@@ -10,8 +10,8 @@ export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function CreateProject(arg1, arg2) {
-  return window['go']['main']['App']['CreateProject'](arg1, arg2);
+export function CreateProject(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
 }
 
 export function CreateScript(arg1, arg2, arg3) {
@@ -90,6 +90,10 @@ export function RunScript(arg1) {
   return window['go']['main']['App']['RunScript'](arg1);
 }
 
+export function SelectDirectory() {
+  return window['go']['main']['App']['SelectDirectory']();
+}
+
 export function SendMessage(arg1, arg2, arg3) {
   return window['go']['main']['App']['SendMessage'](arg1, arg2, arg3);
 }
@@ -102,8 +106,8 @@ export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
-export function UpdateProject(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3);
+export function UpdateProject(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3, arg4);
 }
 
 export function UpdateScript(arg1, arg2, arg3, arg4) {

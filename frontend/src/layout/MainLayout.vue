@@ -39,6 +39,7 @@ import {
   PeopleOutline as AgentIcon,
   HammerOutline as ToolIcon,
   ChatbubbleOutline as ChatIcon,
+  OptionsOutline as ModeIcon,
 } from "@vicons/ionicons5";
 
 const collapsed = ref(false);
@@ -93,6 +94,12 @@ const menuOptions = [
     key: "Tools",
     icon: renderIcon(ToolIcon),
     onClick: () => router.push({ name: "Tools" }),
+  },
+  {
+    label: "模式管理",
+    key: "Modes",
+    icon: renderIcon(ModeIcon),
+    onClick: () => router.push({ name: "Modes" }),
   },
   {
     label: "智能对话",

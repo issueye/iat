@@ -15,10 +15,24 @@
     />
 
     <!-- Create/Edit Modal -->
-    <n-modal v-model:show="showCreateModal" preset="dialog" :title="isEdit ? '编辑项目' : '新建项目'">
+    <n-modal
+      v-model:show="showCreateModal"
+      preset="dialog"
+      :title="isEdit ? '编辑项目' : '新建项目'"
+    >
       <n-form ref="formRef" :model="formValue" :rules="rules">
         <n-form-item label="名称" path="name">
           <n-input v-model:value="formValue.name" placeholder="项目名称" />
+        </n-form-item>
+        <n-form-item label="路径" path="path">
+          <n-input-group>
+            <n-input
+              v-model:value="formValue.path"
+              placeholder="项目路径"
+              readonly
+            />
+            <n-button type="primary" @click="handleSelectDir">选择</n-button>
+          </n-input-group>
         </n-form-item>
         <n-form-item label="描述" path="description">
           <n-input
@@ -32,7 +46,7 @@
         <n-space>
           <n-button @click="closeModal">取消</n-button>
           <n-button type="primary" :loading="submitting" @click="handleSubmit">
-            {{ isEdit ? '更新' : '创建' }}
+            {{ isEdit ? "更新" : "创建" }}
           </n-button>
         </n-space>
       </template>
@@ -41,63 +55,78 @@
 </template>
 
 <script setup>
-import { ref, onMounted, h } from 'vue'
-import { NButton, NSpace, useMessage, useDialog } from 'naive-ui'
-import { ListProjects, CreateProject, UpdateProject, DeleteProject } from '../../wailsjs/go/main/App'
+import { ref, onMounted, h } from "vue";
+import { NButton, NSpace, useMessage, useDialog, NInputGroup } from "naive-ui";
+import {
+  ListProjects,
+  CreateProject,
+  UpdateProject,
+  DeleteProject,
+  SelectDirectory,
+} from "../../wailsjs/go/main/App";
 
-const message = useMessage()
-const dialog = useDialog()
+const message = useMessage();
+const dialog = useDialog();
 
-const projects = ref([])
-const loading = ref(false)
-const showCreateModal = ref(false)
-const submitting = ref(false)
-const isEdit = ref(false)
-const editingId = ref(null)
+const projects = ref([]);
+const loading = ref(false);
+const showCreateModal = ref(false);
+const submitting = ref(false);
+const isEdit = ref(false);
+const editingId = ref(null);
 
 const formValue = ref({
-  name: '',
-  description: ''
-})
+  name: "",
+  description: "",
+  path: "",
+});
 
 const rules = {
   name: {
     required: true,
-    message: '请输入项目名称',
-    trigger: 'blur'
-  }
-}
+    message: "请输入项目名称",
+    trigger: "blur",
+  },
+};
 
 const pagination = {
-  pageSize: 10
-}
+  pageSize: 10,
+};
 
 const columns = [
   {
-    title: 'ID',
-    key: 'id',
-    width: 80
+    title: "ID",
+    key: "id",
+    width: 80,
   },
   {
-    title: '名称',
-    key: 'name',
-    width: 200
+    title: "名称",
+    key: "name",
+    width: 200,
   },
   {
-    title: '描述',
-    key: 'description'
+    title: "路径",
+    key: "path",
+    width: 200,
+    ellipsis: {
+      tooltip: true,
+    },
   },
   {
-    title: '创建时间',
-    key: 'createdAt',
+    title: "描述",
+    key: "description",
+  },
+  {
+    title: "创建时间",
+    key: "createdAt",
     width: 200,
     render(row) {
-      return new Date(row.createdAt).toLocaleString()
-    }
+      return new Date(row.createdAt).toLocaleString();
+    },
   },
   {
-    title: '操作',
-    key: 'actions',
+    title: "操作",
+    key: "actions",
     width: 150,
     render(row) {
       return h(NSpace, null, {
@@ -105,111 +134,136 @@ const columns = [
           h(
             NButton,
             {
-              size: 'small',
-              onClick: () => handleEdit(row)
+              size: "small",
+              onClick: () => handleEdit(row),
             },
-            { default: () => '编辑' }
+            { default: () => "编辑" }
           ),
           h(
             NButton,
             {
-              size: 'small',
-              type: 'error',
-              onClick: () => handleDelete(row)
+              size: "small",
+              type: "error",
+              onClick: () => handleDelete(row),
             },
-            { default: () => '删除' }
-          )
-        ]
-      })
-    }
-  }
-]
+            { default: () => "删除" }
+          ),
+        ],
+      });
+    },
+  },
+];
 
 async function loadProjects() {
-  loading.value = true
+  loading.value = true;
   try {
-    const res = await ListProjects()
+    const res = await ListProjects();
     if (res.code === 200) {
-      projects.value = res.data || []
+      projects.value = res.data || [];
     } else {
-      message.error(res.msg)
+      message.error(res.msg);
     }
   } catch (e) {
-    message.error('加载项目失败: ' + e)
+    message.error("加载项目失败: " + e);
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
 function handleEdit(row) {
-  isEdit.value = true
-  editingId.value = row.id
+  isEdit.value = true;
+  editingId.value = row.id;
   formValue.value = {
     name: row.name,
-    description: row.description
+    description: row.description,
+    path: row.path,
+  };
+  showCreateModal.value = true;
+}
+
+async function handleSelectDir() {
+  try {
+    const res = await SelectDirectory();
+    if (res.code === 200) {
+      if (res.data) {
+        formValue.value.path = res.data;
+      }
+    } else {
+      message.error(res.msg);
+    }
+  } catch (e) {
+    message.error("选择目录失败: " + e);
   }
-  showCreateModal.value = true
 }
 
 function handleDelete(row) {
   dialog.warning({
-    title: '确认删除',
+    title: "确认删除",
     content: `确定要删除项目 "${row.name}" 吗？`,
-    positiveText: '确认',
-    negativeText: '取消',
+    positiveText: "确认",
+    negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        const res = await DeleteProject(row.id)
+        const res = await DeleteProject(row.id);
         if (res.code === 200) {
-          message.success('删除成功')
-          loadProjects()
+          message.success("删除成功");
+          loadProjects();
         } else {
-          message.error(res.msg)
+          message.error(res.msg);
         }
       } catch (e) {
-        message.error('删除失败: ' + e)
+        message.error("删除失败: " + e);
       }
-    }
-  })
+    },
+  });
 }
 
 function closeModal() {
-  showCreateModal.value = false
-  formValue.value = { name: '', description: '' }
-  isEdit.value = false
-  editingId.value = null
+  showCreateModal.value = false;
+  formValue.value = { name: "", description: "", path: "" };
+  isEdit.value = false;
+  editingId.value = null;
 }
 
 async function handleSubmit() {
   if (!formValue.value.name) {
-    message.warning('请输入名称')
-    return
+    message.warning("请输入名称");
+    return;
   }
-  
-  submitting.value = true
+
+  submitting.value = true;
   try {
-    let res
+    let res;
     if (isEdit.value) {
-      res = await UpdateProject(editingId.value, formValue.value.name, formValue.value.description)
+      res = await UpdateProject(
+        editingId.value,
+        formValue.value.name,
+        formValue.value.description,
+        formValue.value.path
+      );
     } else {
-      res = await CreateProject(formValue.value.name, formValue.value.description)
+      res = await CreateProject(
+        formValue.value.name,
+        formValue.value.description,
+        formValue.value.path
+      );
     }
-    
+
     if (res.code === 200) {
-      message.success(isEdit.value ? '更新成功' : '创建成功')
-      closeModal()
-      loadProjects()
+      message.success(isEdit.value ? "更新成功" : "创建成功");
+      closeModal();
+      loadProjects();
     } else {
-      message.error(res.msg)
+      message.error(res.msg);
     }
   } catch (e) {
-    message.error('操作失败: ' + e)
+    message.error("操作失败: " + e);
   } finally {
-    submitting.value = false
+    submitting.value = false;
   }
 }
 
 onMounted(() => {
-  loadProjects()
-})
+  loadProjects();
+});
 </script>
