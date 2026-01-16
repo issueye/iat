@@ -76,7 +76,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 		// Plan agent: Ensure system prompt includes instructions to only operate in 'plan' directory
 		// And maybe we can enforce it in tool implementation (but that requires context awareness in tool)
 		// For now, let's append a strict instruction to system prompt
-		agent.SystemPrompt += "\n\nIMPORTANT: You are strictly limited to operating within the 'plan' directory. Do not read or write files outside of this directory."
+		agent.SystemPrompt += consts.SystemPromptPlanRestriction
 	} else if agent.Name == consts.AgentNameBuild && agent.Type == consts.AgentTypeBuiltin {
 		// Build agent has all permissions.
 	}

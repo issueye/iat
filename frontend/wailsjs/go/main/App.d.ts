@@ -45,7 +45,7 @@ export function ListTools():Promise<common.Result>;
 
 export function RunScript(arg1:number):Promise<common.Result>;
 
-export function SendMessage(arg1:number,arg2:string):Promise<common.Result>;
+export function SendMessage(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
 
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
 
