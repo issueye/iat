@@ -91,7 +91,7 @@
                 :markdown="item.content"
                 default-theme-mode="light"
                 style="text-align: left"
-                :enable-code-line-number="true"
+                :code-x-props="{ enableCodeLineNumber: true }"
               />
             </template>
             <template #footer="{ item }">
