@@ -138,6 +138,7 @@ import {
   DeleteSession,
   ListAgents,
   SendMessage,
+  ListMessages,
 } from "../../wailsjs/go/main/App";
 
 const route = useRoute();
@@ -213,6 +214,7 @@ async function loadSessions(pid) {
         const exists = sessions.value.find((s) => s.id === sid);
         if (exists) {
           currentSessionId.value = sid;
+          loadHistory(sid);
         } else {
           currentSessionId.value = null;
         }
@@ -254,10 +256,26 @@ async function confirmCreateSession() {
   }
 }
 
+async function loadHistory(sid) {
+  try {
+    const res = await ListMessages(sid);
+    if (res.code === 200) {
+      const history = res.data || [];
+      messages.value = history.map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        isMarkdown: msg.role === "assistant",
+      }));
+    }
+  } catch (e) {
+    message.error("加载历史记录失败");
+  }
+}
+
 function handleSelectSession(sid) {
   currentSessionId.value = sid;
   router.push({ name: "Chat", params: { sessionId: sid } });
-  messages.value = []; // TODO: Load history
+  loadHistory(sid);
 }
 
 async function handleDeleteSession(sid) {

@@ -222,3 +222,11 @@ func (a *App) SendMessage(sessionID uint, userMessage string) *common.Result {
 	}
 	return common.Success(nil)
 }
+
+func (a *App) ListMessages(sessionID uint) *common.Result {
+	messages, err := a.chatService.ListMessages(sessionID)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(messages)
+}

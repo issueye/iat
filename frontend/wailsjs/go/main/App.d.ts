@@ -29,6 +29,8 @@ export function ListAIModels():Promise<common.Result>;
 
 export function ListAgents():Promise<common.Result>;
 
+export function ListMessages(arg1:number):Promise<common.Result>;
+
 export function ListProjects():Promise<common.Result>;
 
 export function ListScripts():Promise<common.Result>;

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iat/internal/model"
 	"iat/internal/pkg/ai"
 	"iat/internal/pkg/sse"
 	"iat/internal/repo"
@@ -15,6 +16,7 @@ type ChatService struct {
 	sessionRepo *repo.SessionRepo
 	agentRepo   *repo.AgentRepo
 	modelRepo   *repo.AIModelRepo
+	messageRepo *repo.MessageRepo
 	sseHandler  *sse.SSEHandler
 }
 
@@ -23,8 +25,14 @@ func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
 		sessionRepo: repo.NewSessionRepo(),
 		agentRepo:   repo.NewAgentRepo(),
 		modelRepo:   repo.NewAIModelRepo(),
+		messageRepo: repo.NewMessageRepo(),
 		sseHandler:  sseHandler,
 	}
+}
+
+// ListMessages returns history messages for a session
+func (s *ChatService) ListMessages(sessionID uint) ([]model.Message, error) {
+	return s.messageRepo.ListBySessionID(sessionID)
 }
 
 // Chat handles the main chat logic
@@ -57,16 +65,38 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 	}
 
 	// 5. Construct Messages (System + User)
-	// TODO: Load history messages from DB
+	// Save User Message
+	userMsg := &model.Message{
+		SessionID: sessionID,
+		Role:      "user",
+		Content:   userMessage,
+	}
+	if err := s.messageRepo.Create(userMsg); err != nil {
+		return fmt.Errorf("failed to save user message: %v", err)
+	}
+
+	// Load History (including the one just saved, but we need structure for AI client)
+	history, err := s.messageRepo.ListBySessionID(sessionID)
+	if err != nil {
+		return fmt.Errorf("failed to load history: %v", err)
+	}
+
 	messages := []*schema.Message{
 		{
 			Role:    schema.System,
 			Content: agent.SystemPrompt,
 		},
-		{
-			Role:    schema.User,
-			Content: userMessage,
-		},
+	}
+	
+	for _, msg := range history {
+		role := schema.User
+		if msg.Role == "assistant" {
+			role = schema.Assistant
+		}
+		messages = append(messages, &schema.Message{
+			Role:    role,
+			Content: msg.Content,
+		})
 	}
 
 	// 6. Stream Chat
@@ -83,6 +113,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 		}
 		defer stream.Close()
 
+		fullResponse := ""
 		for {
 			chunk, err := stream.Recv()
 			if err != nil {
@@ -92,6 +123,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 			// Send chunk to frontend via SSE
 			// Format: JSON with sessionId and content delta
 			if chunk.Content != "" {
+				fullResponse += chunk.Content
 				msg, _ := json.Marshal(map[string]interface{}{
 					"sessionId": sessionID,
 					"delta":     chunk.Content,
@@ -99,6 +131,15 @@ func (s *ChatService) Chat(sessionID uint, userMessage string) error {
 				s.sseHandler.Send(string(msg))
 			}
 		}
+		
+		// Save Assistant Message
+		aiMsg := &model.Message{
+			SessionID: sessionID,
+			Role:      "assistant",
+			Content:   fullResponse,
+		}
+		s.messageRepo.Create(aiMsg)
+
 		// Send done signal
 		doneMsg, _ := json.Marshal(map[string]interface{}{
 			"sessionId": sessionID,
