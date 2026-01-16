@@ -19,6 +19,26 @@ import (
 	"github.com/eino-contrib/jsonschema"
 )
 
+func stripThinkContent(input string) string {
+	s := input
+	for {
+		start := strings.Index(s, "<think>")
+		if start == -1 {
+			break
+		}
+		rest := s[start+len("<think>"):]
+		endRel := strings.Index(rest, "</think>")
+		if endRel == -1 {
+			s = s[:start]
+			break
+		}
+		end := start + len("<think>") + endRel + len("</think>")
+		s = s[:start] + s[end:]
+	}
+	s = strings.ReplaceAll(s, "</think>", "")
+	return strings.TrimSpace(s)
+}
+
 type sessionCancel struct {
 	id     uint64
 	cancel context.CancelFunc
@@ -329,12 +349,14 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 
 	for _, msg := range history {
 		role := schema.User
+		content := msg.Content
 		if msg.Role == consts.RoleAssistant {
 			role = schema.Assistant
+			content = stripThinkContent(content)
 		}
 		messages = append(messages, &schema.Message{
 			Role:    role,
-			Content: msg.Content,
+			Content: content,
 		})
 	}
 
@@ -499,7 +521,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				// Append to conversation context for next turn
 				messages = append(messages, &schema.Message{
 					Role:      schema.Assistant,
-					Content:   fullResponse,
+					Content:   stripThinkContent(fullResponse),
 					ToolCalls: toolCalls,
 				})
 			}

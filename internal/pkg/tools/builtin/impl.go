@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -92,7 +93,34 @@ func ListFiles(path string) (string, error) {
 // --- Command Execution ---
 
 func RunCommand(command string, args []string) (string, error) {
-	cmd := exec.Command(command, args...)
+	if strings.TrimSpace(command) == "" {
+		return "", fmt.Errorf("command is required")
+	}
+
+	useShell := false
+	if len(args) == 0 {
+		if strings.ContainsAny(command, "&|;<>\n\r\t") || strings.Contains(command, "&&") || strings.Contains(command, "||") {
+			useShell = true
+		} else {
+			for _, r := range command {
+				if r == ' ' {
+					useShell = true
+					break
+				}
+			}
+		}
+	}
+
+	var cmd *exec.Cmd
+	if useShell {
+		if runtime.GOOS == "windows" {
+			cmd = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command)
+		} else {
+			cmd = exec.Command("sh", "-lc", command)
+		}
+	} else {
+		cmd = exec.Command(command, args...)
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %v, output: %s", err, string(output))

@@ -203,69 +203,62 @@
             </template>
           </BubbleList>
 
-          <div style="display: flex; align-items: center; margin-bottom: 8px">
-            <n-select
-              v-model:value="currentChatMode"
-              :options="modeOptions"
-              size="small"
-              style="width: 120px"
-              placeholder="模式"
-            />
-            <n-select
-              v-model:value="currentChatAgentId"
-              :options="agentOptions"
-              size="small"
-              style="width: 180px; margin-left: 8px"
-              placeholder="选择 Agent"
-              clearable
-            />
-            <span style="font-size: 12px; color: #999; margin-left: 8px"
-              >(模式与 Agent 共同决定对话逻辑)</span
-            >
-            <span style="font-size: 12px; color: #999; margin-left: 12px"
-              >累计 Tokens: {{ totalTokenUsage }}</span
-            >
-            <n-button
-              size="small"
-              secondary
-              style="margin-left: auto"
-              @click="openSessionDetail"
-            >
-              <template #icon
-                ><n-icon><InformationCircleOutline /></n-icon
-              ></template>
-              详情
-            </n-button>
-            <n-button
-              size="small"
-              secondary
-              style="margin-left: 8px"
-              @click="handleCompressSession"
-            >
-              <template #icon
-                ><n-icon><ContractOutline /></n-icon
-              ></template>
-              压缩
-            </n-button>
-            <n-button
-              size="small"
-              type="error"
-              secondary
-              style="margin-left: 8px"
-              @click="handleClearSession"
-            >
-              清空会话
-            </n-button>
-            <n-button
-              size="small"
-              type="warning"
-              secondary
-              style="margin-left: 8px"
-              :disabled="!isGenerating"
-              @click="handleTerminateSession"
-            >
-              终止生成
-            </n-button>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px">
+              <n-select
+                v-model:value="currentChatMode"
+                :options="modeOptions"
+                size="small"
+                style="width: 120px"
+                placeholder="模式"
+              />
+              <n-select
+                v-model:value="currentChatAgentId"
+                :options="agentOptions"
+                size="small"
+                style="width: 180px"
+                placeholder="选择 Agent"
+                clearable
+              />
+              <span style="font-size: 12px; color: #999"
+                >(模式与 Agent 共同决定对话逻辑)</span
+              >
+              <span style="font-size: 12px; color: #999"
+                >累计 Tokens: {{ totalTokenUsage }}</span
+              >
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: flex-end; gap: 8px">
+              <n-button size="small" secondary @click="openSessionDetail">
+                <template #icon
+                  ><n-icon><InformationCircleOutline /></n-icon
+                ></template>
+                详情
+              </n-button>
+              <n-button size="small" secondary @click="handleCompressSession">
+                <template #icon
+                  ><n-icon><ContractOutline /></n-icon
+                ></template>
+                压缩
+              </n-button>
+              <n-button
+                size="small"
+                type="error"
+                secondary
+                @click="handleClearSession"
+              >
+                清空会话
+              </n-button>
+              <n-button
+                size="small"
+                type="warning"
+                secondary
+                :disabled="!isGenerating"
+                @click="handleTerminateSession"
+              >
+                终止生成
+              </n-button>
+            </div>
           </div>
 
           <Sender
