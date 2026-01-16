@@ -377,8 +377,12 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 			// but here we are in a single goroutine sequentially updating messages.
 
 			// 376: stream, err := aiClient.StreamChat(ctx, messages)
-			// Capture the prompt sent to AI
-			promptJSON, _ := json.Marshal(messages)
+			// Capture the prompt and tools sent to AI
+			promptData := map[string]interface{}{
+				"messages": messages,
+				"tools":    einoTools,
+			}
+			promptJSON, _ := json.Marshal(promptData)
 			currentPrompt := string(promptJSON)
 
 			stream, err := aiClient.StreamChat(ctx, messages)
