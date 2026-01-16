@@ -34,7 +34,7 @@ func (s *AIModelService) ListModels() ([]model.AIModel, error) {
 
 func (s *AIModelService) TestConnection(m *model.AIModel) error {
 	// Use temporary client to test connection
-	client, err := ai.NewAIClient(m)
+	client, err := ai.NewAIClient(m, nil)
 	if err != nil {
 		return err
 	}

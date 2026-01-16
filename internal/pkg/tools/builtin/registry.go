@@ -19,9 +19,30 @@ var ToolFunctions = map[string]interface{}{
 	"HttpPost":    HttpPost,
 }
 
-func GetEinoTools() []schema.ToolInfo {
-	var tools []schema.ToolInfo
+func GetEinoTools(agentName string) []*schema.ToolInfo {
+	var tools []*schema.ToolInfo
 	for _, t := range BuiltinTools {
+		// Permission Filter based on Agent Name
+		if agentName == "Chat" {
+			// Chat agent gets NO tools
+			continue
+		} else if agentName == "Plan" {
+			// Plan agent only gets file operations (read/write/list)
+			// We can filter by name or some property. 
+			// Assuming file operations are: read_file, write_file, list_files
+			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" {
+				continue
+			}
+		} else if agentName == "Build" {
+			// Build agent gets ALL tools
+		} else {
+			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
+			// If we are strictly following "Chat/Plan/Build" logic, we might restrict others too.
+			// But for custom agents, they usually have explicit tool bindings in DB. 
+			// This function currently returns ALL builtin tools filtered by hardcoded logic.
+			// Ideally, we should pass the list of allowed tool names.
+		}
+
 		var s jsonschema.Schema
 		if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
 			// Skip tools with invalid schema or log error
@@ -29,7 +50,7 @@ func GetEinoTools() []schema.ToolInfo {
 			fmt.Printf("Failed to parse schema for tool %s: %v\n", t.Name, err)
 			continue
 		}
-		tools = append(tools, schema.ToolInfo{
+		tools = append(tools, &schema.ToolInfo{
 			Name: t.Name,
 			Desc: t.Description,
 			ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),

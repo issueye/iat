@@ -13,7 +13,7 @@ type AIClient struct {
 	chatModel *openai.ChatModel
 }
 
-func NewAIClient(config *model.AIModel) (*AIClient, error) {
+func NewAIClient(config *model.AIModel, tools []*schema.ToolInfo) (*AIClient, error) {
 	// Eino currently supports OpenAI compatible interfaces
 	chatModel, err := openai.NewChatModel(context.Background(), &openai.ChatModelConfig{
 		BaseURL: config.BaseURL,
@@ -22,6 +22,13 @@ func NewAIClient(config *model.AIModel) (*AIClient, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chat model: %v", err)
+	}
+
+	if len(tools) > 0 {
+		// Bind tools to the model
+		if err := chatModel.BindTools(tools); err != nil {
+			return nil, fmt.Errorf("failed to bind tools: %v", err)
+		}
 	}
 
 	return &AIClient{
