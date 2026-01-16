@@ -35,6 +35,7 @@ import {
   HomeOutline as HomeIcon,
   ListOutline as ProjectIcon,
   HardwareChipOutline as ModelIcon,
+  CodeSlashOutline as ScriptIcon,
   ChatbubbleOutline as ChatIcon
 } from '@vicons/ionicons5'
 
@@ -66,6 +67,12 @@ const menuOptions = [
     key: 'Models',
     icon: renderIcon(ModelIcon),
     onClick: () => router.push({ name: 'Models' })
+  },
+  {
+    label: 'Scripts',
+    key: 'Scripts',
+    icon: renderIcon(ScriptIcon),
+    onClick: () => router.push({ name: 'Scripts' })
   },
   {
     label: 'Chat',

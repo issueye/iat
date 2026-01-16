@@ -21,6 +21,11 @@ const routes = [
                 component: () => import('../views/Models.vue')
             },
             {
+                path: 'scripts',
+                name: 'Scripts',
+                component: () => import('../views/Scripts.vue')
+            },
+            {
                 path: 'chat/:sessionId?',
                 name: 'Chat',
                 component: () => import('../views/Chat.vue')
