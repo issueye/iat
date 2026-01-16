@@ -11,12 +11,14 @@ import (
 	"unicode"
 
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/util"
 )
 
 var (
 	openOnce sync.Once
 	openDB   *leveldb.DB
 	openErr  error
+	openPath string
 )
 
 type ProjectMeta struct {
@@ -37,17 +39,41 @@ func getAppDir() (string, error) {
 	return appDir, nil
 }
 
+func DefaultDBPath() (string, error) {
+	if dir := strings.TrimSpace(os.Getenv("IAT_INDEXDB_DIR")); dir != "" {
+		return filepath.Clean(dir), nil
+	}
+	appDir, err := getAppDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(appDir, "indexdb"), nil
+}
+
 func OpenDefault() (*leveldb.DB, error) {
 	openOnce.Do(func() {
-		appDir, err := getAppDir()
+		dbPath, err := DefaultDBPath()
 		if err != nil {
 			openErr = err
 			return
 		}
-		dbPath := filepath.Join(appDir, "indexdb")
+		openPath = dbPath
 		openDB, openErr = leveldb.OpenFile(dbPath, nil)
 	})
 	return openDB, openErr
+}
+
+func OpenedPath() string {
+	return openPath
+}
+
+func CloseDefault() error {
+	if openDB == nil {
+		return nil
+	}
+	err := openDB.Close()
+	openDB = nil
+	return err
 }
 
 func IndexProject(id uint, name string, path string) error {
@@ -116,37 +142,41 @@ func IndexProject(id uint, name string, path string) error {
 }
 
 func SearchProjectIDs(query string) ([]uint, error) {
-	q := strings.TrimSpace(query)
+	q := strings.ToLower(strings.TrimSpace(query))
 	if q == "" {
 		return nil, nil
 	}
+
 	db, err := OpenDefault()
 	if err != nil {
 		return nil, err
 	}
 
-	tokens := tokenizeQuery(q)
-	if len(tokens) == 0 {
-		return nil, nil
+	projectIDSet := make(map[uint]struct{})
+	
+	// Prefix search for tokens
+	prefix := []byte("tok:" + q)
+	iter := db.NewIterator(util.BytesPrefix(prefix), nil)
+	defer iter.Release()
+	for iter.Next() {
+		var ids []uint
+		if err := json.Unmarshal(iter.Value(), &ids); err == nil {
+			for _, id := range ids {
+				projectIDSet[id] = struct{}{}
+			}
+		}
+	}
+	
+	if err := iter.Error(); err != nil {
+		return nil, err
 	}
 
-	var current []uint
-	for i, tok := range tokens {
-		postingKey := []byte("tok:" + tok)
-		ids := getPostingIDs(db, postingKey)
-		if len(ids) == 0 {
-			return nil, nil
-		}
-		if i == 0 {
-			current = ids
-			continue
-		}
-		current = intersectUintSorted(current, ids)
-		if len(current) == 0 {
-			return nil, nil
-		}
+	res := make([]uint, 0, len(projectIDSet))
+	for id := range projectIDSet {
+		res = append(res, id)
 	}
-	return current, nil
+	sort.Slice(res, func(i, j int) bool { return res[i] < res[j] })
+	return res, nil
 }
 
 func getPostingIDs(db *leveldb.DB, key []byte) []uint {
@@ -283,4 +313,3 @@ func min(a int, b int) int {
 	}
 	return b
 }
-

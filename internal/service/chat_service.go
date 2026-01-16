@@ -646,10 +646,11 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 					}
 					indexSvc := NewIndexService()
 					if all {
-						if err := indexSvc.IndexAllProjects(); err != nil {
+						info, err := indexSvc.IndexAllProjects()
+						if err != nil {
 							resultStr = fmt.Sprintf("Error: %v", err)
 						} else {
-							resultStr = "success"
+							resultStr = fmt.Sprintf("success: indexed=%d files=%d dbPath=%s", info.Indexed, info.Files, info.DBPath)
 						}
 						break
 					}
@@ -657,10 +658,11 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint) err
 						resultStr = "Error: projectId is required"
 						break
 					}
-					if err := indexSvc.IndexProject(pid); err != nil {
+					info, err := indexSvc.IndexProject(pid)
+					if err != nil {
 						resultStr = fmt.Sprintf("Error: %v", err)
 					} else {
-						resultStr = "success"
+						resultStr = fmt.Sprintf("success: indexed=%d files=%d dbPath=%s", info.Indexed, info.Files, info.DBPath)
 					}
 				default:
 					// Check if it's a script tool

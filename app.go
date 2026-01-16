@@ -98,17 +98,19 @@ func (a *App) DeleteProject(id uint) *common.Result {
 }
 
 func (a *App) IndexProject(id uint) *common.Result {
-	if err := a.indexService.IndexProject(id); err != nil {
+	data, err := a.indexService.IndexProject(id)
+	if err != nil {
 		return common.Fail(err.Error())
 	}
-	return common.Success(nil)
+	return common.Success(data)
 }
 
 func (a *App) IndexAllProjects() *common.Result {
-	if err := a.indexService.IndexAllProjects(); err != nil {
+	data, err := a.indexService.IndexAllProjects()
+	if err != nil {
 		return common.Fail(err.Error())
 	}
-	return common.Success(nil)
+	return common.Success(data)
 }
 
 // --- AI Model Methods ---

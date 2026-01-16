@@ -201,7 +201,12 @@ async function handleIndex(row) {
   try {
     const res = await IndexProject(row.id);
     if (res.code === 200) {
-      message.success("索引完成");
+      const indexed = res.data?.indexed ?? 1;
+      const files = res.data?.files;
+      const dbPath = res.data?.dbPath ? `（${res.data.dbPath}）` : "";
+      message.success(
+        `索引完成：项目${indexed}${files != null ? ` 文件${files}` : ""}${dbPath}`
+      );
     } else {
       message.error(res.msg || "索引失败");
     }
@@ -217,7 +222,12 @@ async function handleIndexAll() {
   try {
     const res = await IndexAllProjects();
     if (res.code === 200) {
-      message.success("索引完成");
+      const indexed = res.data?.indexed ?? 0;
+      const files = res.data?.files;
+      const dbPath = res.data?.dbPath ? `（${res.data.dbPath}）` : "";
+      message.success(
+        `索引完成：项目${indexed}${files != null ? ` 文件${files}` : ""}${dbPath}`
+      );
     } else {
       message.error(res.msg || "索引失败");
     }
