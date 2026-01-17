@@ -286,4 +286,24 @@ var BuiltinTools = []model.Tool{
 			}
 		}`,
 	},
+	{
+		Name:        "call_subagent",
+		Description: "Call another agent (SubAgent) to perform a specific task",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "CallSubAgent",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"agentName": {
+					"type": "string",
+					"description": "The name of the agent to call"
+				},
+				"query": {
+					"type": "string",
+					"description": "The task or query for the sub-agent"
+				}
+			},
+			"required": ["agentName", "query"]
+		}`,
+	},
 }
