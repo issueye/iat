@@ -151,15 +151,15 @@
               </div>
               <div v-else-if="item.role === 'assistant'">
                 <Thinking
-                  v-if="splitThinkContent(item.content).think"
+                  v-if="parseThinkContent(item.content).think"
                   v-model="item.thinkExpanded"
-                  :content="splitThinkContent(item.content).think"
+                  :content="parseThinkContent(item.content).think"
                   :status="getThinkingStatus(item)"
                   auto-collapse
                 />
                 <XMarkdown
-                  v-if="splitThinkContent(item.content).answer"
-                  :markdown="splitThinkContent(item.content).answer"
+                  v-if="parseThinkContent(item.content).answer"
+                  :markdown="parseThinkContent(item.content).answer"
                   default-theme-mode="light"
                   style="text-align: left"
                   :code-x-props="{ enableCodeLineNumber: true }"
@@ -428,28 +428,50 @@ const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
 const searchingSessions = ref(false);
 
-function splitThinkContent(text) {
+function parseThinkContent(text) {
   const raw = String(text || "");
-  const thinkParts = [];
-  const thinkRe = /<think>([\s\S]*?)<\/think>/g;
-  let answer = raw.replace(thinkRe, (_, inner) => {
-    const s = String(inner || "").trim();
-    if (s) thinkParts.push(s);
-    return "";
-  });
+  const thinkOpenTag = "<think>";
+  const thinkCloseTag = "</think>";
+  let i = 0;
+  let inThink = false;
+  let answer = "";
+  let think = "";
 
-  const openIdx = answer.lastIndexOf("<think>");
-  if (openIdx !== -1) {
-    const before = answer.slice(0, openIdx);
-    const after = answer.slice(openIdx + "<think>".length);
-    answer = before;
-    const s = String(after || "").trim();
-    if (s) thinkParts.push(s);
+  while (i < raw.length) {
+    const openAt = raw.indexOf(thinkOpenTag, i);
+    const closeAt = raw.indexOf(thinkCloseTag, i);
+
+    const nextAt =
+      openAt === -1
+        ? closeAt
+        : closeAt === -1
+          ? openAt
+          : Math.min(openAt, closeAt);
+
+    if (nextAt === -1) {
+      const chunk = raw.slice(i);
+      if (inThink) think += chunk;
+      else answer += chunk;
+      break;
+    }
+
+    const chunk = raw.slice(i, nextAt);
+    if (inThink) think += chunk;
+    else answer += chunk;
+
+    if (nextAt === openAt) {
+      inThink = true;
+      i = nextAt + thinkOpenTag.length;
+    } else {
+      inThink = false;
+      i = nextAt + thinkCloseTag.length;
+    }
   }
 
   return {
-    think: thinkParts.join("\n\n"),
-    answer: String(answer || "").replace(/<\/think>/g, "").trim(),
+    think: think.trim(),
+    answer: answer.trim(),
+    isThinkingOpen: inThink,
   };
 }
 
@@ -457,8 +479,12 @@ function getThinkingStatus(item) {
   if (item !== lastAssistantMessage.value) return "end";
   if (generationStatus.value === "cancel") return "cancel";
   if (generationStatus.value === "error") return "error";
+  const parsed = parseThinkContent(item?.content);
   if (isGenerating.value) {
-    return generationStatus.value === "start" ? "start" : "thinking";
+    if (parsed.isThinkingOpen) {
+      return parsed.think ? "thinking" : "start";
+    }
+    return "end";
   }
   return "end";
 }
@@ -566,6 +592,9 @@ function applyMessageMeta(item) {
   }
   if (item.role === "assistant" && typeof item.thinkExpanded !== "boolean") {
     item.thinkExpanded = false;
+  }
+  if (item.role === "tool" && typeof item.collapsed !== "boolean") {
+    item.collapsed = true;
   }
   return item;
 }
@@ -732,9 +761,25 @@ async function loadHistory(sid) {
     if (res.code === 200) {
       const history = res.data || [];
       messages.value = history
-        .filter((m) => String(m?.content || "").trim() !== "")
-        .map((msg) =>
-          applyMessageMeta({
+        .filter((m) => {
+          if (m?.role === "tool") return true;
+          return String(m?.content || "").trim() !== "";
+        })
+        .map((msg) => {
+          if (msg.role === "tool") {
+            return applyMessageMeta({
+              role: "tool",
+              content: "",
+              toolCallId: msg.toolCallId,
+              toolName: msg.toolName,
+              toolArguments: msg.toolArguments,
+              toolOutput: msg.toolOutput,
+              toolOk: msg.toolOk,
+              collapsed: true,
+              createdAt: msg.createdAt,
+            });
+          }
+          return applyMessageMeta({
             role: msg.role,
             content: msg.content,
             prompt: msg.prompt,
@@ -742,8 +787,8 @@ async function loadHistory(sid) {
             tokenUsage:
               msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
             createdAt: msg.createdAt,
-          })
-        );
+          });
+        });
       toolBubbleIndexByCallId.clear();
     }
   } catch (e) {
@@ -874,8 +919,6 @@ function initSSE() {
           handleToolEvent(data.tool);
         }
         if (data.delta) {
-          if (generationStatus.value === "start") generationStatus.value = "thinking";
-
           let appended = false;
           for (let i = messages.value.length - 1; i >= 0; i--) {
             if (messages.value[i]?.role === "assistant") {

@@ -35,4 +35,7 @@ const (
 	RoleUser      = "user"
 	RoleAssistant = "assistant"
 	RoleTool      = "tool"
+
+	// Message Categories
+	MessageCategoryTool = "tool"
 )

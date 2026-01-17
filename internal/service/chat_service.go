@@ -550,20 +550,24 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					"toolCallId": tc.ID,
 				})
 				_ = s.toolRepo.UpsertCall(sessionID, tc.ID, fnName, fnArgs)
+				_ = s.messageRepo.UpsertToolCall(sessionID, tc.ID, fnName, fnArgs)
 
 				// 2. Parse arguments
 				var args map[string]interface{}
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
+					output := fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err)
 					s.sendToolEvent(sessionID, map[string]interface{}{
 						"stage":      "result",
 						"name":       fnName,
 						"toolCallId": tc.ID,
 						"ok":         false,
-						"output":     fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+						"output":     output,
 					})
+					_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, output, false)
+					_ = s.messageRepo.UpsertToolResult(sessionID, tc.ID, fnName, output, false)
 					messages = append(messages, &schema.Message{
 						Role:       schema.Tool,
-						Content:    fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err),
+						Content:    output,
 						ToolCallID: tc.ID,
 					})
 					continue
@@ -743,6 +747,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					ok = false
 				}
 				_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, resultStr, ok)
+				_ = s.messageRepo.UpsertToolResult(sessionID, tc.ID, fnName, resultStr, ok)
 				s.sendToolEvent(sessionID, map[string]interface{}{
 					"stage":      "result",
 					"name":       fnName,

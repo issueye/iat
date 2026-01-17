@@ -2,6 +2,7 @@ package repo
 
 import (
 	"iat/internal/model"
+	"iat/internal/pkg/consts"
 	"iat/internal/pkg/db"
 )
 
@@ -23,4 +24,76 @@ func (r *MessageRepo) ListBySessionID(sessionID uint) ([]model.Message, error) {
 
 func (r *MessageRepo) DeleteBySessionID(sessionID uint) error {
 	return db.DB.Where("session_id = ?", sessionID).Delete(&model.Message{}).Error
+}
+
+func (r *MessageRepo) UpsertToolCall(sessionID uint, toolCallID string, name string, arguments string) error {
+	if toolCallID == "" {
+		return db.DB.Create(&model.Message{
+			SessionID:     sessionID,
+			Role:          consts.RoleTool,
+			Category:      consts.MessageCategoryTool,
+			ToolCallID:    toolCallID,
+			ToolName:      name,
+			ToolArgs:      arguments,
+			ToolHasResult: false,
+			ToolOk:        false,
+		}).Error
+	}
+
+	var existing model.Message
+	err := db.DB.Where("session_id = ? AND role = ? AND tool_call_id = ?", sessionID, consts.RoleTool, toolCallID).First(&existing).Error
+	if err == nil {
+		existing.Category = consts.MessageCategoryTool
+		existing.ToolName = name
+		existing.ToolArgs = arguments
+		return db.DB.Save(&existing).Error
+	}
+
+	return db.DB.Create(&model.Message{
+		SessionID:     sessionID,
+		Role:          consts.RoleTool,
+		Category:      consts.MessageCategoryTool,
+		ToolCallID:    toolCallID,
+		ToolName:      name,
+		ToolArgs:      arguments,
+		ToolHasResult: false,
+		ToolOk:        false,
+	}).Error
+}
+
+func (r *MessageRepo) UpsertToolResult(sessionID uint, toolCallID string, name string, output string, ok bool) error {
+	if toolCallID == "" {
+		return db.DB.Create(&model.Message{
+			SessionID:     sessionID,
+			Role:          consts.RoleTool,
+			Category:      consts.MessageCategoryTool,
+			ToolCallID:    toolCallID,
+			ToolName:      name,
+			ToolOutput:    output,
+			ToolHasResult: true,
+			ToolOk:        ok,
+		}).Error
+	}
+
+	var existing model.Message
+	err := db.DB.Where("session_id = ? AND role = ? AND tool_call_id = ?", sessionID, consts.RoleTool, toolCallID).First(&existing).Error
+	if err == nil {
+		existing.Category = consts.MessageCategoryTool
+		existing.ToolName = name
+		existing.ToolOutput = output
+		existing.ToolHasResult = true
+		existing.ToolOk = ok
+		return db.DB.Save(&existing).Error
+	}
+
+	return db.DB.Create(&model.Message{
+		SessionID:     sessionID,
+		Role:          consts.RoleTool,
+		Category:      consts.MessageCategoryTool,
+		ToolCallID:    toolCallID,
+		ToolName:      name,
+		ToolOutput:    output,
+		ToolHasResult: true,
+		ToolOk:        ok,
+	}).Error
 }
