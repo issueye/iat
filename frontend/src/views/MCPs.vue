@@ -235,7 +235,7 @@ const columns = [
   {
     title: "操作",
     key: "actions",
-    width: 150,
+    width: 240,
     fixed: "right",
     render(row) {
       return h(NSpace, null, {

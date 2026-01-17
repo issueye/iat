@@ -66,19 +66,19 @@ func InitDB() error {
 func seedModes(db *gorm.DB) {
 	modes := []model.Mode{
 		{
-			Key:          "chat",
+			Key:          consts.ChatMode,
 			Name:         "Chat",
 			Description:  "General conversational mode",
 			SystemPrompt: consts.SystemPromptChat,
 		},
 		{
-			Key:          "plan",
+			Key:          consts.PlanMode,
 			Name:         "Plan",
 			Description:  "Planning mode with restricted file access",
 			SystemPrompt: consts.SystemPromptPlan,
 		},
 		{
-			Key:          "build",
+			Key:          consts.BuildMode,
 			Name:         "Build",
 			Description:  "Build mode with full project access",
 			SystemPrompt: consts.SystemPromptBuild,
@@ -110,7 +110,7 @@ func seedBuiltinTools(db *gorm.DB) {
 		Name:        "calculate_sum",
 		Description: "Calculates the sum of two numbers using a JS script",
 		Type:        consts.ToolTypeScript,
-		Content:     `
+		Content: `
 // args is injected by the engine
 var a = args.a;
 var b = args.b;
@@ -137,32 +137,11 @@ a + b;
 func seedBuiltinAgents(db *gorm.DB) {
 	// Pre-fetch modes
 	var chatMode, planMode, buildMode model.Mode
-	db.Where("key = ?", "chat").First(&chatMode)
-	db.Where("key = ?", "plan").First(&planMode)
-	db.Where("key = ?", "build").First(&buildMode)
+	db.Where("key = ?", consts.ChatMode).First(&chatMode)
+	db.Where("key = ?", consts.PlanMode).First(&planMode)
+	db.Where("key = ?", consts.BuildMode).First(&buildMode)
 
 	agents := []model.Agent{
-		{
-			Name:         consts.AgentNameChat,
-			Description:  "A helpful AI assistant for general conversation.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptChat,
-			ModeID:       chatMode.ID,
-		},
-		{
-			Name:         consts.AgentNamePlan,
-			Description:  "A planning expert that helps breakdown complex tasks.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptPlan,
-			ModeID:       planMode.ID,
-		},
-		{
-			Name:         consts.AgentNameBuild,
-			Description:  "A coding and build automation expert.",
-			Type:         consts.AgentTypeBuiltin,
-			SystemPrompt: consts.SystemPromptBuild,
-			ModeID:       buildMode.ID,
-		},
 		{
 			Name:         consts.AgentNameProductManager,
 			Description:  "Analyzes requirements and defines product features (PRD).",
@@ -229,7 +208,7 @@ func seedBuiltinAgents(db *gorm.DB) {
 			// Update ModeID and SystemPrompt for existing agents if they changed
 			var existingAgent model.Agent
 			db.Where("name = ? AND type = ?", agent.Name, consts.AgentTypeBuiltin).First(&existingAgent)
-			
+
 			needsUpdate := false
 			if existingAgent.ModeID == 0 {
 				existingAgent.ModeID = agent.ModeID
@@ -239,7 +218,7 @@ func seedBuiltinAgents(db *gorm.DB) {
 				existingAgent.SystemPrompt = agent.SystemPrompt
 				needsUpdate = true
 			}
-			
+
 			if needsUpdate {
 				db.Save(&existingAgent)
 				log.Printf("Updated builtin agent: %s", agent.Name)

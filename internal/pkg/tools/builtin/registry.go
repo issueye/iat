@@ -13,35 +13,39 @@ import (
 )
 
 var ToolFunctions = map[string]interface{}{
-	"ReadFile":    ReadFile,
-	"WriteFile":   WriteFile,
-	"ListFiles":   ListFiles,
-	"RunCommand":  RunCommand,
-	"RunScript":   RunScript,
-	"HttpGet":     HttpGet,
-	"HttpPost":    HttpPost,
+	"ReadFile":   ReadFile,
+	"WriteFile":  WriteFile,
+	"ListFiles":  ListFiles,
+	"RunCommand": RunCommand,
+	"RunScript":  RunScript,
+	"HttpGet":    HttpGet,
+	"HttpPost":   HttpPost,
 }
 
 func GetEinoTools(modeKey string) []*schema.ToolInfo {
 	var tools []*schema.ToolInfo
 	for _, t := range BuiltinTools {
 		// Permission Filter based on Agent Name
-		if modeKey == "chat" {
+		if modeKey == consts.ChatMode {
 			// Chat agent gets NO tools
 			continue
-		} else if modeKey == "plan" {
+		} else if modeKey == consts.PlanMode {
 			// Plan agent only gets file operations (read/write/list)
-			// We can filter by name or some property. 
+			// We can filter by name or some property.
 			// Assuming file operations are: read_file, write_file, list_files, read_file_range, diff_file
-			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" && t.Name != "read_file_range" && t.Name != "diff_file" {
+			if t.Name != consts.ToolReadFile.ToString() &&
+				t.Name != consts.ToolWriteFile.ToString() &&
+				t.Name != consts.ToolListFiles.ToString() &&
+				t.Name != consts.ToolReadFileRange.ToString() &&
+				t.Name != consts.ToolDiffFile.ToString() {
 				continue
 			}
-		} else if modeKey == "build" {
+		} else if modeKey == consts.BuildMode {
 			// Build agent gets ALL tools
 		} else {
 			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
 			// If we are strictly following "Chat/Plan/Build" logic, we might restrict others too.
-			// But for custom agents, they usually have explicit tool bindings in DB. 
+			// But for custom agents, they usually have explicit tool bindings in DB.
 			// This function currently returns ALL builtin tools filtered by hardcoded logic.
 			// Ideally, we should pass the list of allowed tool names.
 		}
@@ -54,8 +58,8 @@ func GetEinoTools(modeKey string) []*schema.ToolInfo {
 			continue
 		}
 		tools = append(tools, &schema.ToolInfo{
-			Name: t.Name,
-			Desc: t.Description,
+			Name:        t.Name,
+			Desc:        t.Description,
 			ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
 		})
 	}
@@ -68,7 +72,7 @@ func WrapToolFunction(name string, fn interface{}) func(ctx context.Context, inp
 	// Since Eino tools usually take (ctx, input) and return (output, error)
 	// We might need to adapt our simple functions to this signature.
 	// For now, let's keep it simple and just return a placeholder or specific wrappers.
-	
+
 	// Real implementation would use reflection to map input map to function arguments.
 	return func(ctx context.Context, input map[string]interface{}) (string, error) {
 		return "", fmt.Errorf("WrapToolFunction not implemented for %s", name)
@@ -78,7 +82,7 @@ func WrapToolFunction(name string, fn interface{}) func(ctx context.Context, inp
 var BuiltinTools = []model.Tool{
 	// File Operations
 	{
-		Name:        "read_file",
+		Name:        consts.ToolReadFile.ToString(),
 		Description: "Read the contents of a file from the local filesystem",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "ReadFile",
@@ -94,7 +98,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "read_file_range",
+		Name:        consts.ToolReadFileRange.ToString(),
 		Description: "Read a specific range of lines from a file (useful for large files)",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "ReadFileRange",
@@ -118,7 +122,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "diff_file",
+		Name:        consts.ToolDiffFile.ToString(),
 		Description: "Show the differences between two files",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "DiffFile",
@@ -138,7 +142,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "write_file",
+		Name:        consts.ToolWriteFile.ToString(),
 		Description: "Write content to a file on the local filesystem (overwrites if exists)",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "WriteFile",
@@ -158,7 +162,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "list_files",
+		Name:        consts.ToolListFiles.ToString(),
 		Description: "List files and directories in a given directory path",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "ListFiles",
@@ -176,7 +180,7 @@ var BuiltinTools = []model.Tool{
 
 	// Command Execution
 	{
-		Name:        "run_command",
+		Name:        consts.ToolRunCommand.ToString(),
 		Description: "Execute a shell command",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "RunCommand",
@@ -199,7 +203,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "run_script",
+		Name:        consts.ToolRunScript.ToString(),
 		Description: "Execute a script file (python, js, sh, go)",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "RunScript",
@@ -224,7 +228,7 @@ var BuiltinTools = []model.Tool{
 
 	// Network Requests
 	{
-		Name:        "http_get",
+		Name:        consts.ToolHttpGet.ToString(),
 		Description: "Perform an HTTP GET request",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "HttpGet",
@@ -240,7 +244,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "http_post",
+		Name:        consts.ToolHttpPost.ToString(),
 		Description: "Perform an HTTP POST request",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "HttpPost",
@@ -264,7 +268,7 @@ var BuiltinTools = []model.Tool{
 		}`,
 	},
 	{
-		Name:        "index_project",
+		Name:        consts.ToolIndexProject.ToString(),
 		Description: "Index projects for searching sessions by project name",
 		Type:        consts.ToolTypeBuiltin,
 		Content:     "IndexProject",
