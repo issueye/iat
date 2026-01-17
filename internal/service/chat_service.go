@@ -544,7 +544,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				fnName := tc.Function.Name
 				fnArgs := tc.Function.Arguments
 				s.sendToolEvent(sessionID, map[string]interface{}{
-					"stage":      "call",
+					"stage":      consts.ToolStageCall,
 					"name":       fnName,
 					"arguments":  fnArgs,
 					"toolCallId": tc.ID,
@@ -557,7 +557,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				if err := json.Unmarshal([]byte(fnArgs), &args); err != nil {
 					output := fmt.Sprintf("Error parsing arguments for tool %s: %v", fnName, err)
 					s.sendToolEvent(sessionID, map[string]interface{}{
-						"stage":      "result",
+						"stage":      consts.ToolStageResult,
 						"name":       fnName,
 						"toolCallId": tc.ID,
 						"ok":         false,
@@ -749,7 +749,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, resultStr, ok)
 				_ = s.messageRepo.UpsertToolResult(sessionID, tc.ID, fnName, resultStr, ok)
 				s.sendToolEvent(sessionID, map[string]interface{}{
-					"stage":      "result",
+					"stage":      consts.ToolStageResult,
 					"name":       fnName,
 					"toolCallId": tc.ID,
 					"ok":         ok,

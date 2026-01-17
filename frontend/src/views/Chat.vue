@@ -104,7 +104,7 @@
             style="flex: 1; margin-bottom: 20px; overflow: hidden"
           >
             <template #content="{ item }">
-              <div v-if="item.role === 'tool'">
+              <div v-if="item.role === ChatRoles.Tool">
                 <div
                   style="
                     display: flex;
@@ -149,7 +149,7 @@
                   </template>
                 </div>
               </div>
-              <div v-else-if="item.role === 'assistant'">
+              <div v-else-if="item.role === ChatRoles.Assistant">
                 <Thinking
                   v-if="parseThinkContent(item.content).think"
                   v-model="item.thinkExpanded"
@@ -179,7 +179,7 @@
                   {{ item.tokenUsage }}
                 </span>
                 <n-button
-                  v-if="item.role === 'user'"
+                  v-if="item.role === ChatRoles.User"
                   size="tiny"
                   text
                   type="primary"
@@ -190,7 +190,7 @@
                   重新发送
                 </n-button>
                 <n-button
-                  v-if="item.role === 'assistant' && item.prompt"
+                  v-if="item.role === ChatRoles.Assistant && item.prompt"
                   size="tiny"
                   text
                   type="primary"
@@ -376,6 +376,14 @@ import {
   ListToolInvocations,
   SearchSessionsByProjectName,
 } from "../../wailsjs/go/main/App";
+import {
+  ChatModes,
+  ChatRoles,
+  SSE,
+  ThinkTags,
+  ThinkingStatuses,
+  ToolStages,
+} from "../constants/chat";
 
 const route = useRoute();
 const router = useRouter();
@@ -388,24 +396,24 @@ const sessions = ref([]);
 const agents = ref([]);
 const currentProjectId = ref(null);
 const currentSessionId = ref(null);
-const currentChatMode = ref("chat");
+const currentChatMode = ref(ChatModes.Chat);
 const currentChatAgentId = ref(null);
 const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
-const generationStatus = ref("end");
+const generationStatus = ref(ThinkingStatuses.End);
 
 const lastAssistantMessage = computed(() => {
   for (let i = messages.value.length - 1; i >= 0; i--) {
-    if (messages.value[i]?.role === "assistant") return messages.value[i];
+    if (messages.value[i]?.role === ChatRoles.Assistant) return messages.value[i];
   }
   return null;
 });
 
 const modeOptions = [
-  { label: "对话 (Chat)", value: "chat" },
-  { label: "计划 (Plan)", value: "plan" },
-  { label: "构建 (Build)", value: "build" },
+  { label: "对话 (Chat)", value: ChatModes.Chat },
+  { label: "计划 (Plan)", value: ChatModes.Plan },
+  { label: "构建 (Build)", value: ChatModes.Build },
 ];
 
 const totalTokenUsage = computed(() => {
@@ -418,7 +426,7 @@ const totalTokenUsage = computed(() => {
 // Create Modal State
 const showCreateModal = ref(false);
 const newSessionName = ref("");
-const selectedMode = ref("chat");
+const selectedMode = ref(ChatModes.Chat);
 const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
 const showPromptModal = ref(false);
@@ -430,8 +438,8 @@ const searchingSessions = ref(false);
 
 function parseThinkContent(text) {
   const raw = String(text || "");
-  const thinkOpenTag = "<think>";
-  const thinkCloseTag = "</think>";
+  const thinkOpenTag = ThinkTags.Open;
+  const thinkCloseTag = ThinkTags.Close;
   let i = 0;
   let inThink = false;
   let answer = "";
@@ -476,17 +484,17 @@ function parseThinkContent(text) {
 }
 
 function getThinkingStatus(item) {
-  if (item !== lastAssistantMessage.value) return "end";
-  if (generationStatus.value === "cancel") return "cancel";
-  if (generationStatus.value === "error") return "error";
+  if (item !== lastAssistantMessage.value) return ThinkingStatuses.End;
+  if (generationStatus.value === ThinkingStatuses.Cancel) return ThinkingStatuses.Cancel;
+  if (generationStatus.value === ThinkingStatuses.Error) return ThinkingStatuses.Error;
   const parsed = parseThinkContent(item?.content);
   if (isGenerating.value) {
     if (parsed.isThinkingOpen) {
-      return parsed.think ? "thinking" : "start";
+      return parsed.think ? ThinkingStatuses.Thinking : ThinkingStatuses.Start;
     }
-    return "end";
+    return ThinkingStatuses.End;
   }
-  return "end";
+  return ThinkingStatuses.End;
 }
 
 const isSearchingSessions = computed(() => {
@@ -583,17 +591,20 @@ function formatTime(input) {
 
 function applyMessageMeta(item) {
   if (!item) return item;
-  if (item.role === "user") {
+  if (item.role === ChatRoles.User) {
     item.placement = "end";
     item.avatar = userAvatar;
   } else {
     item.placement = "start";
     item.avatar = aiAvatar;
   }
-  if (item.role === "assistant" && typeof item.thinkExpanded !== "boolean") {
+  if (
+    item.role === ChatRoles.Assistant &&
+    typeof item.thinkExpanded !== "boolean"
+  ) {
     item.thinkExpanded = false;
   }
-  if (item.role === "tool" && typeof item.collapsed !== "boolean") {
+  if (item.role === ChatRoles.Tool && typeof item.collapsed !== "boolean") {
     item.collapsed = true;
   }
   return item;
@@ -613,10 +624,10 @@ function handleToolEvent(tool) {
   const toolCallId = tool.toolCallId || "";
   const name = tool.name || "unknown";
 
-  if (tool.stage === "call") {
+  if (tool.stage === ToolStages.Call) {
     const idx =
       messages.value.push({
-        role: "tool",
+        role: ChatRoles.Tool,
         toolName: name,
         toolArguments: tool.arguments || "",
         toolOutput: "",
@@ -634,7 +645,7 @@ function handleToolEvent(tool) {
     return;
   }
 
-  if (tool.stage === "result") {
+  if (tool.stage === ToolStages.Result) {
     const ok = tool.ok !== false;
     const idx = toolCallId ? toolBubbleIndexByCallId.get(toolCallId) : null;
     if (idx != null && messages.value[idx]) {
@@ -643,7 +654,7 @@ function handleToolEvent(tool) {
       return;
     }
     messages.value.push({
-      role: "tool",
+      role: ChatRoles.Tool,
       toolName: name,
       toolArguments: tool.arguments || "",
       toolOutput: tool.output || "",
@@ -743,7 +754,7 @@ async function confirmCreateSession() {
     if (res.code === 200) {
       showCreateModal.value = false;
       newSessionName.value = "";
-      selectedMode.value = "chat";
+      selectedMode.value = ChatModes.Chat;
       selectedAgentId.value = null;
 
       await loadSessions(currentProjectId.value);
@@ -762,13 +773,13 @@ async function loadHistory(sid) {
       const history = res.data || [];
       messages.value = history
         .filter((m) => {
-          if (m?.role === "tool") return true;
+          if (m?.role === ChatRoles.Tool) return true;
           return String(m?.content || "").trim() !== "";
         })
         .map((msg) => {
-          if (msg.role === "tool") {
+          if (msg.role === ChatRoles.Tool) {
             return applyMessageMeta({
-              role: "tool",
+              role: ChatRoles.Tool,
               content: "",
               toolCallId: msg.toolCallId,
               toolName: msg.toolName,
@@ -783,9 +794,9 @@ async function loadHistory(sid) {
             role: msg.role,
             content: msg.content,
             prompt: msg.prompt,
-            isMarkdown: msg.role === "assistant",
+            isMarkdown: msg.role === ChatRoles.Assistant,
             tokenUsage:
-              msg.role === "assistant" ? Number(msg.tokenCount || 0) : 0,
+              msg.role === ChatRoles.Assistant ? Number(msg.tokenCount || 0) : 0,
             createdAt: msg.createdAt,
           });
         });
@@ -798,7 +809,7 @@ async function loadHistory(sid) {
 
 function handleSelectSession(sid) {
   currentSessionId.value = sid;
-  currentChatMode.value = "chat"; // Default mode
+  currentChatMode.value = ChatModes.Chat; // Default mode
   currentChatAgentId.value = null; // Reset temp agent selection when switching session
   router.push({ name: "Chat", params: { sessionId: sid } });
   loadHistory(sid);
@@ -853,12 +864,12 @@ async function handleSend(payload) {
   if (!content || !content.trim()) return;
 
   inputText.value = "";
-  generationStatus.value = "start";
+  generationStatus.value = ThinkingStatuses.Start;
 
   // Optimistic UI update
   messages.value.push(
     applyMessageMeta({
-      role: "user",
+      role: ChatRoles.User,
       content: content,
       isMarkdown: false,
       createdAt: new Date().toISOString(),
@@ -869,7 +880,7 @@ async function handleSend(payload) {
   const aiMsgIndex =
     messages.value.push(
       applyMessageMeta({
-        role: "assistant",
+        role: ChatRoles.Assistant,
         content: "",
         isMarkdown: true,
         tokenUsage: 0,
@@ -892,7 +903,7 @@ async function handleSend(payload) {
       message.error(res.msg);
       messages.value[aiMsgIndex].content = "[错误: " + res.msg + "]";
       isGenerating.value = false;
-      generationStatus.value = "error";
+      generationStatus.value = ThinkingStatuses.Error;
     }
   } catch (e) {
     message.error("发送失败: " + e);
@@ -903,13 +914,13 @@ async function handleSend(payload) {
       messages.value[aiMsgIndex].content = "[错误: 发送失败]";
     }
     isGenerating.value = false;
-    generationStatus.value = "error";
+    generationStatus.value = ThinkingStatuses.Error;
   }
 }
 
 // SSE Setup
 function initSSE() {
-  eventSource = new EventSource("http://localhost:8080/events");
+  eventSource = new EventSource(SSE.EventsUrl);
   eventSource.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
@@ -921,7 +932,7 @@ function initSSE() {
         if (data.delta) {
           let appended = false;
           for (let i = messages.value.length - 1; i >= 0; i--) {
-            if (messages.value[i]?.role === "assistant") {
+            if (messages.value[i]?.role === ChatRoles.Assistant) {
               messages.value[i].content += data.delta;
               appended = true;
               break;
@@ -930,7 +941,7 @@ function initSSE() {
           if (!appended) {
             messages.value.push(
               applyMessageMeta({
-                role: "assistant",
+                role: ChatRoles.Assistant,
                 content: data.delta,
                 isMarkdown: true,
                 tokenUsage: 0,
@@ -942,7 +953,7 @@ function initSSE() {
         if (data.usage) {
           const usage = Number(data.usage || 0);
           for (let i = messages.value.length - 1; i >= 0; i--) {
-            if (messages.value[i]?.role === "assistant") {
+            if (messages.value[i]?.role === ChatRoles.Assistant) {
               messages.value[i].tokenUsage = Number.isFinite(usage) ? usage : 0;
               break;
             }
@@ -950,18 +961,24 @@ function initSSE() {
         }
         if (data.done) {
           isGenerating.value = false;
-          generationStatus.value = "end";
+          generationStatus.value = ThinkingStatuses.End;
           const last = messages.value[messages.value.length - 1];
-          if (last?.role === "assistant" && String(last.content || "").trim() === "") {
+          if (
+            last?.role === ChatRoles.Assistant &&
+            String(last.content || "").trim() === ""
+          ) {
             messages.value.pop();
           }
         }
         if (data.terminated) {
           message.warning("已终止生成");
           isGenerating.value = false;
-          generationStatus.value = "cancel";
+          generationStatus.value = ThinkingStatuses.Cancel;
           const last = messages.value[messages.value.length - 1];
-          if (last?.role === "assistant" && String(last.content || "").trim() === "") {
+          if (
+            last?.role === ChatRoles.Assistant &&
+            String(last.content || "").trim() === ""
+          ) {
             messages.value.pop();
           }
           return;
@@ -969,14 +986,14 @@ function initSSE() {
         if (data.error) {
           const last = messages.value[messages.value.length - 1];
           if (
-            last?.role === "assistant" &&
+            last?.role === ChatRoles.Assistant &&
             String(last.content || "").trim() === ""
           ) {
             last.content = "[错误: " + data.error + "]";
           }
           message.error("AI 错误: " + data.error);
           isGenerating.value = false;
-          generationStatus.value = "error";
+          generationStatus.value = ThinkingStatuses.Error;
         }
       }
     } catch (e) {
@@ -998,7 +1015,7 @@ async function handleClearSession() {
         messages.value = [];
         toolBubbleIndexByCallId.clear();
         isGenerating.value = false;
-        generationStatus.value = "end";
+        generationStatus.value = ThinkingStatuses.End;
       } else {
         message.error(res.msg || "清空失败");
       }
@@ -1011,7 +1028,7 @@ async function handleTerminateSession() {
   const res = await TerminateSession(currentSessionId.value);
   if (res.code === 200) {
     isGenerating.value = false;
-    generationStatus.value = "cancel";
+    generationStatus.value = ThinkingStatuses.Cancel;
   } else {
     message.error(res.msg || "终止失败");
   }

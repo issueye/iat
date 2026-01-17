@@ -38,4 +38,8 @@ const (
 
 	// Message Categories
 	MessageCategoryTool = "tool"
+
+	// Tool stages
+	ToolStageCall   = "call"
+	ToolStageResult = "result"
 )
