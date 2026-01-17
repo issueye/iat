@@ -52,12 +52,13 @@ type ChatService struct {
 	messageRepo *repo.MessageRepo
 	toolRepo    *repo.ToolInvocationRepo
 	sseHandler  *sse.SSEHandler
+	mcpService  *MCPService
 	mu          sync.Mutex
 	genCounter  uint64
 	cancelBySID map[uint]sessionCancel
 }
 
-func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
+func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService) *ChatService {
 	return &ChatService{
 		projectRepo: repo.NewProjectRepo(),
 		sessionRepo: repo.NewSessionRepo(),
@@ -66,6 +67,7 @@ func NewChatService(sseHandler *sse.SSEHandler) *ChatService {
 		messageRepo: repo.NewMessageRepo(),
 		toolRepo:    repo.NewToolInvocationRepo(),
 		sseHandler:  sseHandler,
+		mcpService:  mcpService,
 		cancelBySID: make(map[uint]sessionCancel),
 	}
 }
@@ -738,7 +740,17 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 							resultStr = fmt.Sprintf("%v", res)
 						}
 					} else {
-						resultStr = fmt.Sprintf("Error: Tool function '%s' not found", fnName)
+						handled := false
+						if s.mcpService != nil {
+							res, err := s.mcpService.CallTool(ctx, fnName, args)
+							if err == nil {
+								resultStr = res
+								handled = true
+							}
+						}
+						if !handled {
+							resultStr = fmt.Sprintf("Error: Tool function '%s' not found", fnName)
+						}
 					}
 				}
 

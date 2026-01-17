@@ -18,6 +18,10 @@ export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function CreateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['CreateMCPServer'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
 export function CreateProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
 }
@@ -40,6 +44,10 @@ export function DeleteAIModel(arg1) {
 
 export function DeleteAgent(arg1) {
   return window['go']['main']['App']['DeleteAgent'](arg1);
+}
+
+export function DeleteMCPServer(arg1) {
+  return window['go']['main']['App']['DeleteMCPServer'](arg1);
 }
 
 export function DeleteProject(arg1) {
@@ -80,6 +88,10 @@ export function ListAIModels() {
 
 export function ListAgents() {
   return window['go']['main']['App']['ListAgents']();
+}
+
+export function ListMCPServers() {
+  return window['go']['main']['App']['ListMCPServers']();
 }
 
 export function ListMessages(arg1) {
@@ -136,6 +148,10 @@ export function TestAIModel(arg1) {
 
 export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
   return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+}
+
+export function UpdateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['UpdateMCPServer'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
 export function UpdateProject(arg1, arg2, arg3, arg4) {

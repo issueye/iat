@@ -43,6 +43,7 @@ import {
   ChatbubbleOutline as ChatIcon,
   OptionsOutline as ModeIcon,
   CodeSlashOutline as CodeIcon,
+  ServerOutline as MCPIcon,
 } from "@vicons/ionicons5";
 import ScriptDocsFloat from "../components/ScriptDocsFloat.vue";
 
@@ -97,6 +98,12 @@ const menuOptions = [
     key: "Tools",
     icon: renderIcon(ToolIcon),
     onClick: () => router.push({ name: "Tools" }),
+  },
+  {
+    label: "MCP 管理",
+    key: "MCPs",
+    icon: renderIcon(MCPIcon),
+    onClick: () => router.push({ name: "MCPs" }),
   },
   {
     label: "模式管理",

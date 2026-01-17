@@ -24,10 +24,12 @@ type App struct {
 	toolService    *service.ToolService
 	chatService    *service.ChatService
 	modeService    *service.ModeService
+	mcpService     *service.MCPService
 }
 
 // NewApp creates a new App application struct
 func NewApp(sseHandler *sse.SSEHandler) *App {
+	mcpService := service.NewMCPService()
 	return &App{
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
@@ -36,8 +38,9 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
 		toolService:    service.NewToolService(),
-		chatService:    service.NewChatService(sseHandler),
+		chatService:    service.NewChatService(sseHandler, mcpService),
 		modeService:    service.NewModeService(),
+		mcpService:     mcpService,
 	}
 }
 
@@ -179,6 +182,40 @@ func (a *App) SearchSessionsByProjectName(query string) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(items)
+}
+
+// --- MCP Server Methods ---
+
+func (a *App) CreateMCPServer(name, description, serverType, command, args, env, url string) *common.Result {
+	err := a.mcpService.CreateMCPServer(name, description, serverType, command, args, env, url)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) UpdateMCPServer(id uint, name, description, serverType, command, args, env, url string, enabled bool) *common.Result {
+	err := a.mcpService.UpdateMCPServer(id, name, description, serverType, command, args, env, url, enabled)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) ListMCPServers() *common.Result {
+	servers, err := a.mcpService.ListMCPServers()
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(servers)
+}
+
+func (a *App) DeleteMCPServer(id uint) *common.Result {
+	err := a.mcpService.DeleteMCPServer(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
 }
 
 // --- Script Methods ---

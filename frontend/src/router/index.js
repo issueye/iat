@@ -31,6 +31,11 @@ const routes = [
                 component: () => import('../views/Tools.vue')
             },
             {
+                path: 'mcp',
+                name: 'MCPs',
+                component: () => import('../views/MCPs.vue')
+            },
+            {
                 path: 'modes',
                 name: 'Modes',
                 component: () => import('../views/Modes.vue')
