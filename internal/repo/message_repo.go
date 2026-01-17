@@ -48,6 +48,8 @@ func (r *MessageRepo) UpsertToolCall(sessionID uint, toolCallID string, name str
 		existing.ToolArgs = arguments
 		return db.DB.Save(&existing).Error
 	}
+	// If not found, create new
+
 
 	return db.DB.Create(&model.Message{
 		SessionID:     sessionID,

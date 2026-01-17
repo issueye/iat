@@ -54,6 +54,17 @@ func ResolvePathInBase(baseDir string, userPath string) (string, error) {
 }
 
 func ReadFile(path string) (string, error) {
+	// Check file size first
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to stat file: %v", err)
+	}
+
+	const maxSize = 100 * 1024 // 100KB
+	if info.Size() > maxSize {
+		return "", fmt.Errorf("file too large (%d bytes), please use read_file_range", info.Size())
+	}
+
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file: %v", err)
@@ -80,15 +91,65 @@ func ListFiles(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to list files: %v", err)
 	}
+
+	ignoredDirs := map[string]bool{
+		".git":         true,
+		".idea":        true,
+		".vscode":      true,
+		"node_modules": true,
+		"dist":         true,
+		"build":        true,
+		"vendor":       true,
+		"__pycache__":  true,
+		"target":       true,
+		"bin":          true,
+		"obj":          true,
+	}
+
 	var files []string
+	count := 0
+	maxCount := 100 // Reduced from 500 to save tokens and avoid context overflow
+
 	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() && ignoredDirs[name] {
+			continue
+		}
+
+		// Skip hidden files
+		if strings.HasPrefix(name, ".") {
+			continue
+		}
+
+		if count >= maxCount {
+			files = append(files, fmt.Sprintf("... (truncated, total > %d entries)", maxCount))
+			break
+		}
+
 		info, _ := entry.Info()
 		prefix := "F"
+		sizeStr := ""
 		if entry.IsDir() {
 			prefix = "D"
+		} else {
+			// Simplify size display
+			s := info.Size()
+			if s < 1024 {
+				sizeStr = fmt.Sprintf(" %dB", s)
+			} else if s < 1024*1024 {
+				sizeStr = fmt.Sprintf(" %.1fKB", float64(s)/1024)
+			} else {
+				sizeStr = fmt.Sprintf(" %.1fMB", float64(s)/(1024*1024))
+			}
 		}
-		files = append(files, fmt.Sprintf("[%s] %s (%d bytes)", prefix, entry.Name(), info.Size()))
+		files = append(files, fmt.Sprintf("[%s] %s%s", prefix, name, sizeStr))
+		count++
 	}
+
+	if len(files) == 0 {
+		return "(empty directory)", nil
+	}
+
 	return strings.Join(files, "\n"), nil
 }
 
@@ -116,13 +177,13 @@ func ReadFileRange(path string, startLine, limit int) (string, error) {
 	}
 
 	selectedLines := lines[startIndex:endIndex]
-	
+
 	// Add line numbers
 	var result []string
 	for i, line := range selectedLines {
 		result = append(result, fmt.Sprintf("%d: %s", startIndex+i+1, line))
 	}
-	
+
 	return strings.Join(result, "\n"), nil
 }
 
@@ -139,7 +200,7 @@ func DiffFile(path1, path2 string) (string, error) {
 
 	dmp := diffmatchpatch.New()
 	diffs := dmp.DiffMain(string(content1), string(content2), false)
-	
+
 	// Format diff
 	return dmp.DiffPrettyText(diffs), nil
 }

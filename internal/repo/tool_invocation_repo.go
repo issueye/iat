@@ -40,6 +40,8 @@ func (r *ToolInvocationRepo) UpsertCall(sessionID uint, toolCallID string, name 
 		existing.Arguments = arguments
 		return db.DB.Save(&existing).Error
 	}
+	// If not found, create new
+
 
 	return db.DB.Create(&model.ToolInvocation{
 		SessionID:  sessionID,

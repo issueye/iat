@@ -1,74 +1,116 @@
-# iat - Intelligent Agent Tool
+# IAT (Issueye AI Tool)
 
-`iat` 是一个基于桌面端的 AI 辅助工具，提供类似 Claude Code 的交互体验。结合本地脚本引擎 (`goja`) 与先进 AI 模型 (`eino`)，为开发者提供灵活的 Agent 定义与执行环境。
+IAT 是一个基于 [Wails](https://wails.io/) 构建的现代化 AI Agent 集成开发环境 (IDE) 辅助工具。它结合了强大的大语言模型 (LLM)、MCP (Model Context Protocol) 协议和灵活的插件系统，旨在通过对话式交互辅助开发者完成代码编写、项目管理、任务编排等工作。
 
-## 功能特性
+## ✨ 核心特性
 
-*   **项目管理**: 多项目隔离，清晰管理不同任务上下文。
-*   **AI 模型管理**: 支持配置 OpenAI, DeepSeek, Ollama 等多种模型提供商，支持连接测试。
-*   **脚本系统**: 内置 JS 脚本引擎，支持编写、测试和运行自动化脚本，可作为 Agent 的工具使用。
-*   **Agent 编排**: 自定义 Agent 角色、System Prompt 及关联模型。
-*   **智能对话**:
-    *   流式响应 (SSE)，实时输出 AI 回复。
-    *   Markdown 渲染与代码高亮。
-    *   自动保存会话历史。
+### 1. 多 Agent 协作系统
+*   **自定义 Agent**: 支持创建具有不同角色、System Prompt 和模型配置的 Agent。
+*   **模式切换**: 支持 Chat (对话)、Plan (计划)、Build (构建) 等不同工作模式，不同模式拥有不同的权限和工具集。
+*   **Sub-Agent 机制**: Agent 可以通过 `call_subagent` 工具调用其他 Agent，实现复杂任务的分层处理。
 
-## 技术栈
+### 2. 强大的工具生态 (Tools)
+*   **内置工具**:
+    *   **文件操作**: `ReadFile`, `WriteFile`, `ListFiles`, `ReadFileRange` (大文件读取), `DiffFile` (文件对比)。
+    *   **命令执行**: `RunCommand` (Shell), `RunScript` (JS/Python/Go/Shell 脚本执行)。
+    *   **网络请求**: `HttpGet`, `HttpPost`。
+    *   **项目索引**: `IndexProject` (倒排索引，支持会话搜索)。
+*   **MCP 支持**: 完整支持 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)，可连接任意标准 MCP Server，无限扩展能力。
+*   **Skill 系统**: (开发中) 支持自定义 Skill 扩展。
 
-*   **前端**: Vue 3, Naive UI, Pinia, Vue Router, Vite
-*   **后端**: Go (Wails v2), Gorm (SQLite), Eino (AI Framework), Goja (JS Engine)
+### 3. 结果导向的任务编排 (Task Orchestration)
+*   **任务管理系统**: 内置任务管理模块，支持 Agent 自动拆解目标为子任务。
+*   **可视化看板**: 聊天界面集成实时任务列表 (Side Panel)，展示任务状态 (Pending/InProgress/Completed)。
+*   **自主执行**: Agent 可以通过 `manage_tasks` 工具自主创建、更新、完成任务。
 
-## 快速开始
+### 4. 现代化交互体验
+*   **智能对话**: 支持流式输出 (SSE)、思考过程展示 (`<think>` 标签解析)、Markdown 渲染。
+*   **会话管理**:
+    *   支持多项目管理。
+    *   会话历史记录、搜索、删除。
+    *   **会话压缩**: 智能压缩长会话上下文，节省 Token。
+    *   **重新发送**: 支持编辑并重新发送历史消息。
+*   **UI/UX**: 基于 Vue 3 + Naive UI 构建，提供清爽、响应式的用户界面。
 
-### 开发环境
+## 🛠️ 技术栈
 
-1.  **环境要求**:
-    *   Go 1.21+
-    *   Node.js 16+
-    *   NPM / Yarn
+*   **Backend**: Go (Golang)
+    *   Framework: [Wails v2](https://wails.io/)
+    *   AI Engine: [Eino](https://github.com/cloudwego/eino) (CloudWeGo)
+    *   Database: SQLite (GORM), GoLevelDB (Search Index)
+    *   Protocol: SSE (Server-Sent Events), MCP
+*   **Frontend**: TypeScript
+    *   Framework: Vue 3
+    *   UI Library: Naive UI
+    *   State Management: Pinia
+    *   Markdown: markdown-it, highlight.js
 
-2.  **安装依赖**:
+## 🚀 快速开始
+
+### 前提条件
+*   Go 1.21+
+*   Node.js 18+
+*   NPM / Yarn / PNPM
+
+### 安装与运行
+
+1.  **克隆仓库**
     ```bash
-    # 后端依赖
-    go mod tidy
+    git clone https://github.com/yourusername/iat.git
+    cd iat
+    ```
 
-    # 前端依赖
+2.  **安装前端依赖**
+    ```bash
     cd frontend
     npm install
     ```
 
-3.  **运行开发模式**:
+3.  **运行开发环境**
+    回到项目根目录：
     ```bash
     wails dev
     ```
-    应用启动后，可以在浏览器访问 `http://localhost:34115` 进行调试，或直接使用弹出的桌面窗口。
+    这将同时启动后端服务和前端开发服务器。
 
-### 构建发布
+4.  **构建生产版本**
+    ```bash
+    wails build
+    ```
 
-```bash
-wails build
+## 📂 项目结构
+
 ```
-构建产物将生成在 `build/bin/iat.exe`。
+iat/
+├── app.go              # Wails App 核心逻辑
+├── main.go             # 入口文件
+├── frontend/           # Vue 3 前端代码
+│   ├── src/
+│   │   ├── views/      # 页面组件 (Chat, Agents, MCPs...)
+│   │   ├── components/ # 通用组件 (TaskList, BubbleList...)
+│   │   └── ...
+├── internal/           # 后端核心代码
+│   ├── model/          # 数据模型 (Agent, Session, Task...)
+│   ├── repo/           # 数据库访问层
+│   ├── service/        # 业务逻辑层 (ChatService, AgentService...)
+│   ├── pkg/            # 公共包
+│   │   ├── ai/         # AI 客户端封装
+│   │   ├── tools/      # 工具实现 (Builtin, Script)
+│   │   └── ...
+└── ...
+```
 
-## 使用指南
+## 📝 任务路线图
 
-1.  **配置模型**: 进入 "Models" 页面，添加你的 API Key (如 OpenAI 或 DeepSeek)。点击 "Test Connection" 验证。
-2.  **创建 Agent**: 进入 "Agents" 页面，定义一个新的 Agent (如 "Coding Assistant")，并绑定刚才配置的模型。
-3.  **开始对话**: 进入 "Chat" 页面，选择一个项目，点击 "New Chat"，选择刚才创建的 Agent，即可开始对话。
-4.  **编写脚本**: 进入 "Scripts" 页面，可以编写 JS 脚本来辅助任务 (如 `http.get`, `console.log`)。
+详细开发进度请参考 [task/任务.md](task/任务.md)。
 
-## 目录结构
+*   [x] 基础文件操作与命令执行
+*   [x] 会话管理 (压缩、搜索、上下文控制)
+*   [x] MCP 协议集成
+*   [x] Sub-Agent 递归调用
+*   [x] 任务编排系统 (Task Orchestration)
+*   [ ] Skill 管理模块 (规划中)
 
-*   `cmd/`: 辅助工具与测试代码。
-*   `frontend/`: Vue 前端源码。
-*   `internal/`: Go 后端源码。
-    *   `model/`: 数据库模型。
-    *   `pkg/`: 核心组件 (ai, script, sse, db)。
-    *   `repo/`: 数据访问层。
-    *   `service/`: 业务逻辑层。
-*   `app.go`: Wails 应用主入口与 API 绑定。
-*   `main.go`: 程序入口。
-
-## License
+## 📄 License
 
 MIT

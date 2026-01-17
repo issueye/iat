@@ -25,11 +25,13 @@ type App struct {
 	chatService    *service.ChatService
 	modeService    *service.ModeService
 	mcpService     *service.MCPService
+	taskService    *service.TaskService
 }
 
 // NewApp creates a new App application struct
 func NewApp(sseHandler *sse.SSEHandler) *App {
 	mcpService := service.NewMCPService()
+	taskService := service.NewTaskService(sseHandler)
 	return &App{
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
@@ -38,9 +40,10 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
 		toolService:    service.NewToolService(),
-		chatService:    service.NewChatService(sseHandler, mcpService),
+		chatService:    service.NewChatService(sseHandler, mcpService, taskService),
 		modeService:    service.NewModeService(),
 		mcpService:     mcpService,
+		taskService:    taskService,
 	}
 }
 
@@ -394,4 +397,38 @@ func (a *App) ListToolInvocations(sessionID uint) *common.Result {
 		return common.Fail(err.Error())
 	}
 	return common.Success(items)
+}
+
+// --- Task Methods ---
+
+func (a *App) ListTasks(sessionID uint) *common.Result {
+	tasks, err := a.taskService.ListTasks(sessionID)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(tasks)
+}
+
+func (a *App) CreateTask(sessionID uint, content, priority string) *common.Result {
+	task, err := a.taskService.CreateTask(sessionID, content, priority)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(task)
+}
+
+func (a *App) UpdateTask(id uint, status string) *common.Result {
+	err := a.taskService.UpdateTask(id, status)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
+}
+
+func (a *App) DeleteTask(id uint) *common.Result {
+	err := a.taskService.DeleteTask(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(nil)
 }

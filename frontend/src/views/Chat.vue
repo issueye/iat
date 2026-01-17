@@ -83,6 +83,7 @@
     </n-layout-sider>
 
     <!-- Chat Area -->
+    <n-layout has-sider sider-placement="right" style="flex: 1">
     <n-layout-content
       content-style="display: flex; flex-direction: column; height: 100%;"
     >
@@ -278,6 +279,25 @@
         </div>
       </template>
     </n-layout-content>
+    <n-layout-sider
+        v-if="currentSessionId"
+        bordered
+        collapse-mode="width"
+        :collapsed-width="0"
+        :width="280"
+        show-trigger="arrow-circle"
+        :native-scrollbar="false"
+        @collapse="showTaskPanel = false"
+        @expand="showTaskPanel = true"
+    >
+        <TaskList
+            :tasks="tasks"
+            @add="handleAddTask"
+            @update:status="handleUpdateTaskStatus"
+            @delete="handleDeleteTask"
+        />
+    </n-layout-sider>
+    </n-layout>
 
     <!-- Create Session Modal -->
     <n-modal
@@ -935,6 +955,9 @@ function initSSE() {
       const data = JSON.parse(event.data);
       // Filter by current session
       if (data.sessionId === currentSessionId.value) {
+        if (data.tasks) {
+          tasks.value = data.tasks;
+        }
         if (data.tool) {
           handleToolEvent(data.tool);
         }

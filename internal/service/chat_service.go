@@ -53,12 +53,13 @@ type ChatService struct {
 	toolRepo    *repo.ToolInvocationRepo
 	sseHandler  *sse.SSEHandler
 	mcpService  *MCPService
+	taskService *TaskService
 	mu          sync.Mutex
 	genCounter  uint64
 	cancelBySID map[uint]sessionCancel
 }
 
-func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService) *ChatService {
+func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService, taskService *TaskService) *ChatService {
 	return &ChatService{
 		projectRepo: repo.NewProjectRepo(),
 		sessionRepo: repo.NewSessionRepo(),
@@ -68,6 +69,7 @@ func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService) *ChatSer
 		toolRepo:    repo.NewToolInvocationRepo(),
 		sseHandler:  sseHandler,
 		mcpService:  mcpService,
+		taskService: taskService,
 		cancelBySID: make(map[uint]sessionCancel),
 	}
 }
@@ -98,7 +100,7 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 }
 
 // RunAgentInternal runs an agent synchronously for internal calls (like sub-agents)
-func (s *ChatService) RunAgentInternal(agentName, query, projectRoot string, modeKey string) (string, error) {
+func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string) (string, error) {
 	// 1. Find Agent
 	agents, err := s.agentRepo.List() // TODO: Optimize by Name lookup
 	if err != nil {
@@ -270,9 +272,66 @@ func (s *ChatService) RunAgentInternal(agentName, query, projectRoot string, mod
 				an, _ := args["agentName"].(string)
 				q, _ := args["query"].(string)
 				var subErr error
-				resultStr, subErr = s.RunAgentInternal(an, q, projectRoot, effectiveMode)
+				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode)
 				if subErr != nil {
 					resultStr = fmt.Sprintf("Error calling sub-agent: %v", subErr)
+				}
+				handled = true
+			case "manage_tasks":
+				action, _ := args["action"].(string)
+				content, _ := args["content"].(string)
+				idVal, _ := args["id"].(float64)
+				id := uint(idVal)
+				status, _ := args["status"].(string)
+				priority, _ := args["priority"].(string)
+
+				switch action {
+				case "add":
+					if priority == "" {
+						priority = "medium"
+					}
+					t, err := s.taskService.CreateTask(sessionID, content, priority)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = fmt.Sprintf("Task created: ID=%d", t.ID)
+					}
+				case "update":
+					if id == 0 {
+						resultStr = "Error: ID is required for update"
+						break
+					}
+					if status != "" {
+						err := s.taskService.UpdateTask(id, status)
+						if err != nil {
+							resultStr = fmt.Sprintf("Error: %v", err)
+						} else {
+							resultStr = "Task updated"
+						}
+					} else {
+						resultStr = "Error: Status is required for update"
+					}
+				case "delete":
+					if id == 0 {
+						resultStr = "Error: ID is required for delete"
+						break
+					}
+					err := s.taskService.DeleteTask(id)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = "Task deleted"
+					}
+				case "list":
+					tasks, err := s.taskService.ListTasks(sessionID)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						b, _ := json.Marshal(tasks)
+						resultStr = string(b)
+					}
+				default:
+					resultStr = fmt.Sprintf("Unknown action: %s", action)
 				}
 				handled = true
 			}
@@ -776,14 +835,21 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				// 1. Find function
 				fnName := tc.Function.Name
 				fnArgs := tc.Function.Arguments
+				fmt.Printf("[ChatService] Executing tool: %s\n", fnName) // LOG
+
 				s.sendToolEvent(sessionID, map[string]interface{}{
 					"stage":      consts.ToolStageCall,
 					"name":       fnName,
 					"arguments":  fnArgs,
 					"toolCallId": tc.ID,
 				})
-				_ = s.toolRepo.UpsertCall(sessionID, tc.ID, fnName, fnArgs)
-				_ = s.messageRepo.UpsertToolCall(sessionID, tc.ID, fnName, fnArgs)
+				// ... (upsert calls)
+				if err := s.toolRepo.UpsertCall(sessionID, tc.ID, fnName, fnArgs); err != nil {
+					fmt.Printf("[ChatService] Failed to upsert tool call to repo: %v\n", err)
+				}
+				if err := s.messageRepo.UpsertToolCall(sessionID, tc.ID, fnName, fnArgs); err != nil {
+					fmt.Printf("[ChatService] Failed to upsert tool call to message repo: %v\n", err)
+				}
 
 				// 2. Parse arguments
 				var args map[string]interface{}
@@ -980,11 +1046,67 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					query, _ := args["query"].(string)
 
 					// Run Internal Agent
-					res, err := s.RunAgentInternal(agentName, query, projectRoot, agent.Mode.Key)
+					res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key)
 					if err != nil {
 						resultStr = fmt.Sprintf("Error calling sub-agent '%s': %v", agentName, err)
 					} else {
 						resultStr = res
+					}
+				case "manage_tasks":
+					action, _ := args["action"].(string)
+					content, _ := args["content"].(string)
+					idVal, _ := args["id"].(float64)
+					id := uint(idVal)
+					status, _ := args["status"].(string)
+					priority, _ := args["priority"].(string)
+
+					switch action {
+					case "add":
+						if priority == "" {
+							priority = "medium"
+						}
+						t, err := s.taskService.CreateTask(sessionID, content, priority)
+						if err != nil {
+							resultStr = fmt.Sprintf("Error: %v", err)
+						} else {
+							resultStr = fmt.Sprintf("Task created: ID=%d", t.ID)
+						}
+					case "update":
+						if id == 0 {
+							resultStr = "Error: ID is required for update"
+							break
+						}
+						if status != "" {
+							err := s.taskService.UpdateTask(id, status)
+							if err != nil {
+								resultStr = fmt.Sprintf("Error: %v", err)
+							} else {
+								resultStr = "Task updated"
+							}
+						} else {
+							resultStr = "Error: Status is required for update (currently only status update is supported)"
+						}
+					case "delete":
+						if id == 0 {
+							resultStr = "Error: ID is required for delete"
+							break
+						}
+						err := s.taskService.DeleteTask(id)
+						if err != nil {
+							resultStr = fmt.Sprintf("Error: %v", err)
+						} else {
+							resultStr = "Task deleted"
+						}
+					case "list":
+						tasks, err := s.taskService.ListTasks(sessionID)
+						if err != nil {
+							resultStr = fmt.Sprintf("Error: %v", err)
+						} else {
+							b, _ := json.Marshal(tasks)
+							resultStr = string(b)
+						}
+					default:
+						resultStr = fmt.Sprintf("Unknown action: %s", action)
 					}
 				default:
 					// Check if it's a script tool
@@ -1035,6 +1157,11 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					}
 				}
 
+				// ... (upsert result)
+
+				// LOG RESULT LENGTH
+				fmt.Printf("[ChatService] Tool %s result length: %d\n", fnName, len(resultStr))
+
 				ok := true
 				if strings.HasPrefix(resultStr, "Error:") {
 					ok = false
@@ -1058,6 +1185,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 			}
 
 			// Loop continues to send Tool Results back to LLM
+			fmt.Printf("[ChatService] Tool execution done, continuing loop to LLM...\n")
 		}
 	}()
 

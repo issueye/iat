@@ -306,4 +306,39 @@ var BuiltinTools = []model.Tool{
 			"required": ["agentName", "query"]
 		}`,
 	},
+	{
+		Name:        "manage_tasks",
+		Description: "Manage a task list for the current session (add, update, delete, list)",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "ManageTasks",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"action": {
+					"type": "string",
+					"enum": ["add", "update", "delete", "list"],
+					"description": "The action to perform"
+				},
+				"content": {
+					"type": "string",
+					"description": "Task content/description (for add/update)"
+				},
+				"id": {
+					"type": "number",
+					"description": "Task ID (for update/delete)"
+				},
+				"status": {
+					"type": "string",
+					"enum": ["pending", "in_progress", "completed", "failed"],
+					"description": "Task status (for update)"
+				},
+				"priority": {
+					"type": "string",
+					"enum": ["high", "medium", "low"],
+					"description": "Task priority (for add/update)"
+				}
+			},
+			"required": ["action"]
+		}`,
+	},
 }

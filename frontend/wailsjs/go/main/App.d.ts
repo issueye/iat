@@ -19,6 +19,8 @@ export function CreateScript(arg1:string,arg2:string,arg3:string):Promise<common
 
 export function CreateSession(arg1:number,arg2:string,arg3:number):Promise<common.Result>;
 
+export function CreateTask(arg1:number,arg2:string,arg3:string):Promise<common.Result>;
+
 export function CreateTool(arg1:model.Tool):Promise<common.Result>;
 
 export function DeleteAIModel(arg1:number):Promise<common.Result>;
@@ -32,6 +34,8 @@ export function DeleteProject(arg1:number):Promise<common.Result>;
 export function DeleteScript(arg1:number):Promise<common.Result>;
 
 export function DeleteSession(arg1:number):Promise<common.Result>;
+
+export function DeleteTask(arg1:number):Promise<common.Result>;
 
 export function DeleteTool(arg1:number):Promise<common.Result>;
 
@@ -61,6 +65,8 @@ export function ListScripts():Promise<common.Result>;
 
 export function ListSessions(arg1:number):Promise<common.Result>;
 
+export function ListTasks(arg1:number):Promise<common.Result>;
+
 export function ListToolInvocations(arg1:number):Promise<common.Result>;
 
 export function ListTools():Promise<common.Result>;
@@ -84,5 +90,7 @@ export function UpdateMCPServer(arg1:number,arg2:string,arg3:string,arg4:string,
 export function UpdateProject(arg1:number,arg2:string,arg3:string,arg4:string):Promise<common.Result>;
 
 export function UpdateScript(arg1:number,arg2:string,arg3:string,arg4:string):Promise<common.Result>;
+
+export function UpdateTask(arg1:number,arg2:string):Promise<common.Result>;
 
 export function UpdateTool(arg1:model.Tool):Promise<common.Result>;

@@ -34,6 +34,10 @@ export function CreateSession(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateSession'](arg1, arg2, arg3);
 }
 
+export function CreateTask(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateTask'](arg1, arg2, arg3);
+}
+
 export function CreateTool(arg1) {
   return window['go']['main']['App']['CreateTool'](arg1);
 }
@@ -60,6 +64,10 @@ export function DeleteScript(arg1) {
 
 export function DeleteSession(arg1) {
   return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
+export function DeleteTask(arg1) {
+  return window['go']['main']['App']['DeleteTask'](arg1);
 }
 
 export function DeleteTool(arg1) {
@@ -118,6 +126,10 @@ export function ListSessions(arg1) {
   return window['go']['main']['App']['ListSessions'](arg1);
 }
 
+export function ListTasks(arg1) {
+  return window['go']['main']['App']['ListTasks'](arg1);
+}
+
 export function ListToolInvocations(arg1) {
   return window['go']['main']['App']['ListToolInvocations'](arg1);
 }
@@ -164,6 +176,10 @@ export function UpdateProject(arg1, arg2, arg3, arg4) {
 
 export function UpdateScript(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateScript'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateTask(arg1, arg2) {
+  return window['go']['main']['App']['UpdateTask'](arg1, arg2);
 }
 
 export function UpdateTool(arg1) {
