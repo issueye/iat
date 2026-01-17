@@ -150,6 +150,7 @@
                 </div>
               </div>
               <div v-else-if="item.role === ChatRoles.Assistant">
+                <template v-if="parseThinkContent(item.content).think || parseThinkContent(item.content).answer">
                 <Thinking
                   v-if="parseThinkContent(item.content).think"
                   v-model="item.thinkExpanded"
@@ -160,6 +161,14 @@
                 <XMarkdown
                   v-if="parseThinkContent(item.content).answer"
                   :markdown="parseThinkContent(item.content).answer"
+                  default-theme-mode="light"
+                  style="text-align: left; margin-top: 8px"
+                  :code-x-props="{ enableCodeLineNumber: true }"
+                />
+                </template>
+                <XMarkdown
+                  v-else
+                  :markdown="String(item.content || '')"
                   default-theme-mode="light"
                   style="text-align: left"
                   :code-x-props="{ enableCodeLineNumber: true }"
@@ -930,15 +939,10 @@ function initSSE() {
           handleToolEvent(data.tool);
         }
         if (data.delta) {
-          let appended = false;
-          for (let i = messages.value.length - 1; i >= 0; i--) {
-            if (messages.value[i]?.role === ChatRoles.Assistant) {
-              messages.value[i].content += data.delta;
-              appended = true;
-              break;
-            }
-          }
-          if (!appended) {
+          const lastMsg = messages.value[messages.value.length - 1];
+          if (lastMsg?.role === ChatRoles.Assistant) {
+            lastMsg.content += data.delta;
+          } else {
             messages.value.push(
               applyMessageMeta({
                 role: ChatRoles.Assistant,
