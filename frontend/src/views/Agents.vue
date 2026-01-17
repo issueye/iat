@@ -51,6 +51,14 @@
             placeholder="选择工具"
           />
         </n-form-item>
+        <n-form-item label="关联 MCP 服务" path="mcpServerIds">
+          <n-select
+            v-model:value="formValue.mcpServerIds"
+            multiple
+            :options="mcpOptions"
+            placeholder="选择 MCP 服务"
+          />
+        </n-form-item>
         <n-form-item label="系统提示词" path="systemPrompt">
           <n-input
             v-model:value="formValue.systemPrompt"
@@ -82,6 +90,7 @@ import {
   DeleteAgent,
   ListAIModels,
   ListTools,
+  ListMCPServers,
 } from "../../wailsjs/go/main/App";
 
 const message = useMessage();
@@ -90,6 +99,7 @@ const dialog = useDialog();
 const agents = ref([]);
 const modelOptions = ref([]);
 const toolOptions = ref([]);
+const mcpOptions = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
 const submitting = ref(false);
@@ -102,6 +112,7 @@ const formValue = ref({
   systemPrompt: "",
   modelId: null,
   toolIds: [],
+  mcpServerIds: [],
 });
 
 const rules = {
@@ -148,24 +159,26 @@ const columns = [
     },
   },
   {
-    title: "工具",
+    title: "工具/MCP",
     key: "Tools",
     width: 200,
     render(row) {
-      if (!row.tools || row.tools.length === 0) return "无";
+      const tools = row.tools || [];
+      const mcps = row.mcpServers || [];
+      if (tools.length === 0 && mcps.length === 0) return "无";
+      
+      const tags = [];
+      tools.forEach(t => {
+        tags.push(h(NTag, { type: "success", size: "small", bordered: false }, { default: () => t.name }));
+      });
+      mcps.forEach(m => {
+        tags.push(h(NTag, { type: "warning", size: "small", bordered: false }, { default: () => `MCP:${m.name}` }));
+      });
+
       return h(
         NSpace,
         { size: 4, style: { flexWrap: "wrap" } },
-        {
-          default: () =>
-            row.tools.map((tool) =>
-              h(
-                NTag,
-                { type: "success", size: "small", bordered: false },
-                { default: () => tool.name }
-              )
-            ),
-        }
+        { default: () => tags }
       );
     },
   },
@@ -226,6 +239,16 @@ async function loadData() {
       }));
     }
 
+    // Load MCP Servers
+    const mcpRes = await ListMCPServers();
+    if (mcpRes.code === 200) {
+      mcpOptions.value = (mcpRes.data || []).map((m) => ({
+        label: `${m.name} (${m.enabled ? '已启用' : '已禁用'})`,
+        value: m.id,
+        disabled: !m.enabled
+      }));
+    }
+
     // Load Agents
     const res = await ListAgents();
     if (res.code === 200) {
@@ -249,6 +272,7 @@ function handleEdit(row) {
     systemPrompt: row.systemPrompt,
     modelId: row.modelId,
     toolIds: (row.tools || []).map((t) => t.id),
+    mcpServerIds: (row.mcpServers || []).map((m) => m.id),
   };
   showCreateModal.value = true;
 }
@@ -283,6 +307,7 @@ function closeModal() {
     systemPrompt: "",
     modelId: null,
     toolIds: [],
+    mcpServerIds: [],
   };
   isEdit.value = false;
   editingId.value = null;
@@ -308,6 +333,7 @@ async function handleSubmit() {
         formValue.value.systemPrompt,
         modelId,
         formValue.value.toolIds,
+        formValue.value.mcpServerIds,
         1 // Default ModeID for now
       );
     } else {
@@ -317,15 +343,7 @@ async function handleSubmit() {
         formValue.value.systemPrompt,
         modelId,
         formValue.value.toolIds,
-        // Assuming modeID is handled or defaulted in backend for now, or we need to add it to form
-        // Current CreateAgent signature in frontend call might need update if backend changed
-        // Based on previous context, backend CreateAgent takes modeID.
-        // Let's check App.js signature or just pass 0 if we haven't added Mode selection to UI yet.
-        // For this task, we focus on Model optionality.
-        // We will pass 0 for modeID for now (defaulting to chat in backend maybe? or need update)
-        // Wait, CreateAgent signature in App.go: (name, description, systemPrompt, modelID, toolIDs, modeID)
-        // We need to pass modeID. Let's assume 1 (Chat) or add to form.
-        // For now let's pass 1 as a safe default or 0.
+        formValue.value.mcpServerIds,
         1
       );
     }

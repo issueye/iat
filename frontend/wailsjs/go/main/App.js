@@ -14,8 +14,8 @@ export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
 
-export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function CreateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
@@ -94,6 +94,10 @@ export function ListMCPServers() {
   return window['go']['main']['App']['ListMCPServers']();
 }
 
+export function ListMCPTools(arg1) {
+  return window['go']['main']['App']['ListMCPTools'](arg1);
+}
+
 export function ListMessages(arg1) {
   return window['go']['main']['App']['ListMessages'](arg1);
 }
@@ -146,8 +150,8 @@ export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
 
-export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function UpdateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {

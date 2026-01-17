@@ -168,23 +168,22 @@ func (s *MCPService) getOrConnect(ctx context.Context, server *model.MCPServer) 
 	return cli, nil
 }
 
-func (s *MCPService) GetGlobalTools(ctx context.Context) ([]*schema.ToolInfo, error) {
-	servers, err := s.repo.ListEnabled()
-	if err != nil {
-		return nil, err
-	}
-
+func (s *MCPService) GetToolsForServers(servers []model.MCPServer) ([]*schema.ToolInfo, error) {
 	var result []*schema.ToolInfo
 
 	for _, server := range servers {
-		cli, err := s.getOrConnect(ctx, &server)
+		if !server.Enabled {
+			continue
+		}
+
+		cli, err := s.getOrConnect(context.Background(), &server)
 		if err != nil {
 			log.Printf("Failed to connect to MCP server %s: %v", server.Name, err)
 			continue
 		}
 
 		// List Tools
-		listResp, err := cli.ListTools(ctx, mcp.ListToolsRequest{
+		listResp, err := cli.ListTools(context.Background(), mcp.ListToolsRequest{
 			PaginatedRequest: mcp.PaginatedRequest{
 				Request: mcp.Request{
 					Method: string(mcp.MethodToolsList),
@@ -216,6 +215,60 @@ func (s *MCPService) GetGlobalTools(ctx context.Context) ([]*schema.ToolInfo, er
 				ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&jsSchema),
 			})
 		}
+	}
+	return result, nil
+}
+
+func (s *MCPService) GetGlobalTools(ctx context.Context) ([]*schema.ToolInfo, error) {
+	servers, err := s.repo.ListEnabled()
+	if err != nil {
+		return nil, err
+	}
+	return s.GetToolsForServers(servers)
+}
+
+func (s *MCPService) ListToolsForServer(serverID uint) ([]*schema.ToolInfo, error) {
+	server, err := s.repo.GetByID(serverID)
+	if err != nil {
+		return nil, err
+	}
+	if !server.Enabled {
+		return nil, fmt.Errorf("server is disabled")
+	}
+
+	cli, err := s.getOrConnect(context.Background(), server)
+	if err != nil {
+		return nil, err
+	}
+
+	listResp, err := cli.ListTools(context.Background(), mcp.ListToolsRequest{
+		PaginatedRequest: mcp.PaginatedRequest{
+			Request: mcp.Request{
+				Method: string(mcp.MethodToolsList),
+			},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []*schema.ToolInfo
+	for _, tool := range listResp.Tools {
+		// No need to prefix for simple listing, but to be consistent with ChatService
+		uniqueName := fmt.Sprintf("mcp(%d):%s", server.ID, tool.Name)
+
+		schemaBytes, _ := json.Marshal(tool.InputSchema)
+		var jsSchema jsonschema.Schema
+		if err := json.Unmarshal(schemaBytes, &jsSchema); err != nil {
+			log.Printf("Failed to parse schema for tool %s: %v", tool.Name, err)
+			continue
+		}
+
+		result = append(result, &schema.ToolInfo{
+			Name:        uniqueName,
+			Desc:        tool.Description, // Use original description
+			ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&jsSchema),
+		})
 	}
 	return result, nil
 }

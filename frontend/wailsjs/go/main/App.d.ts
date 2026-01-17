@@ -9,7 +9,7 @@ export function CompressSession(arg1:number):Promise<common.Result>;
 
 export function CreateAIModel(arg1:model.AIModel):Promise<common.Result>;
 
-export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number,arg5:Array<number>,arg6:number):Promise<common.Result>;
+export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:number,arg5:Array<number>,arg6:Array<number>,arg7:number):Promise<common.Result>;
 
 export function CreateMCPServer(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<common.Result>;
 
@@ -49,6 +49,8 @@ export function ListAgents():Promise<common.Result>;
 
 export function ListMCPServers():Promise<common.Result>;
 
+export function ListMCPTools(arg1:number):Promise<common.Result>;
+
 export function ListMessages(arg1:number):Promise<common.Result>;
 
 export function ListModes():Promise<common.Result>;
@@ -75,7 +77,7 @@ export function TerminateSession(arg1:number):Promise<common.Result>;
 
 export function TestAIModel(arg1:model.AIModel):Promise<common.Result>;
 
-export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:number,arg6:Array<number>,arg7:number):Promise<common.Result>;
+export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:number,arg6:Array<number>,arg7:Array<number>,arg8:number):Promise<common.Result>;
 
 export function UpdateMCPServer(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:boolean):Promise<common.Result>;
 

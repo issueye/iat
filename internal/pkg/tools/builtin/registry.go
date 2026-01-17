@@ -32,8 +32,8 @@ func GetEinoTools(modeKey string) []*schema.ToolInfo {
 		} else if modeKey == "plan" {
 			// Plan agent only gets file operations (read/write/list)
 			// We can filter by name or some property. 
-			// Assuming file operations are: read_file, write_file, list_files
-			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" {
+			// Assuming file operations are: read_file, write_file, list_files, read_file_range, diff_file
+			if t.Name != "read_file" && t.Name != "write_file" && t.Name != "list_files" && t.Name != "read_file_range" && t.Name != "diff_file" {
 				continue
 			}
 		} else if modeKey == "build" {
@@ -91,6 +91,50 @@ var BuiltinTools = []model.Tool{
 				}
 			},
 			"required": ["path"]
+		}`,
+	},
+	{
+		Name:        "read_file_range",
+		Description: "Read a specific range of lines from a file (useful for large files)",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "ReadFileRange",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"path": {
+					"type": "string",
+					"description": "The absolute path to the file to read"
+				},
+				"startLine": {
+					"type": "integer",
+					"description": "The line number to start reading from (1-based)"
+				},
+				"limit": {
+					"type": "integer",
+					"description": "The number of lines to read"
+				}
+			},
+			"required": ["path", "startLine", "limit"]
+		}`,
+	},
+	{
+		Name:        "diff_file",
+		Description: "Show the differences between two files",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "DiffFile",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"path1": {
+					"type": "string",
+					"description": "The absolute path to the first file"
+				},
+				"path2": {
+					"type": "string",
+					"description": "The absolute path to the second file"
+				}
+			},
+			"required": ["path1", "path2"]
 		}`,
 	},
 	{

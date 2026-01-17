@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 // --- File Operations ---
@@ -88,6 +90,58 @@ func ListFiles(path string) (string, error) {
 		files = append(files, fmt.Sprintf("[%s] %s (%d bytes)", prefix, entry.Name(), info.Size()))
 	}
 	return strings.Join(files, "\n"), nil
+}
+
+func ReadFileRange(path string, startLine, limit int) (string, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+	totalLines := len(lines)
+
+	if startLine < 1 {
+		startLine = 1
+	}
+	if startLine > totalLines {
+		return "", fmt.Errorf("start line %d exceeds total lines %d", startLine, totalLines)
+	}
+
+	startIndex := startLine - 1
+	endIndex := startIndex + limit
+
+	if endIndex > totalLines {
+		endIndex = totalLines
+	}
+
+	selectedLines := lines[startIndex:endIndex]
+	
+	// Add line numbers
+	var result []string
+	for i, line := range selectedLines {
+		result = append(result, fmt.Sprintf("%d: %s", startIndex+i+1, line))
+	}
+	
+	return strings.Join(result, "\n"), nil
+}
+
+func DiffFile(path1, path2 string) (string, error) {
+	content1, err := os.ReadFile(path1)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file 1: %v", err)
+	}
+
+	content2, err := os.ReadFile(path2)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file 2: %v", err)
+	}
+
+	dmp := diffmatchpatch.New()
+	diffs := dmp.DiffMain(string(content1), string(content2), false)
+	
+	// Format diff
+	return dmp.DiffPrettyText(diffs), nil
 }
 
 // --- Command Execution ---

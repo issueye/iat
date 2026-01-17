@@ -82,6 +82,32 @@
         </n-space>
       </template>
     </n-modal>
+
+    <!-- Tools Modal -->
+    <n-modal
+      v-model:show="showToolsModal"
+      preset="card"
+      :title="`工具列表 - ${currentServerName}`"
+      style="width: 800px; height: 600px;"
+    >
+      <div style="height: 100%; display: flex; flex-direction: column;">
+        <div v-if="toolsLoading" style="display: flex; justify-content: center; padding: 20px;">
+          加载中...
+        </div>
+        <div v-else style="flex: 1; overflow: auto; padding-right: 10px;">
+           <n-data-table
+            :columns="[
+              { title: '名称', key: 'Name', width: 200 },
+              { title: '描述', key: 'Desc' },
+            ]"
+            :data="currentTools"
+          />
+          <div v-if="currentTools.length === 0" style="text-align: center; padding: 20px; color: #999;">
+            暂无工具或连接失败
+          </div>
+        </div>
+      </div>
+    </n-modal>
   </div>
 </template>
 
@@ -108,6 +134,7 @@ import {
   CreateMCPServer,
   UpdateMCPServer,
   DeleteMCPServer,
+  ListMCPTools,
 } from "../../wailsjs/go/main/App";
 
 const message = useMessage();
@@ -116,6 +143,11 @@ const dialog = useDialog();
 const servers = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
+const showToolsModal = ref(false);
+const currentTools = ref([]);
+const currentServerName = ref("");
+const toolsLoading = ref(false);
+
 const submitting = ref(false);
 const isEdit = ref(false);
 const editingId = ref(null);
@@ -210,6 +242,11 @@ const columns = [
         default: () => [
           h(
             NButton,
+            { size: "small", type: "info", onClick: () => handleViewTools(row) },
+            { default: () => "查看工具" }
+          ),
+          h(
+            NButton,
             { size: "small", onClick: () => handleEdit(row) },
             { default: () => "编辑" }
           ),
@@ -237,6 +274,29 @@ async function loadData() {
     message.error("加载数据失败: " + e);
   } finally {
     loading.value = false;
+  }
+}
+
+async function handleViewTools(row) {
+  currentServerName.value = row.name;
+  showToolsModal.value = true;
+  toolsLoading.value = true;
+  currentTools.value = [];
+  
+  try {
+    const res = await ListMCPTools(row.id);
+    if (res.code === 200) {
+      currentTools.value = res.data || [];
+    } else {
+      message.error(res.msg);
+    }
+  } catch (e) {
+    message.error("获取工具失败: " + e);
+  } finally {
+    toolsLoading.value = false;
+
+    console.log('currentTools', currentTools.value);
+    
   }
 }
 

@@ -273,6 +273,12 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 	// Get Builtin Tools
 	einoTools := builtin.GetEinoTools(effectiveMode)
 
+	// Get MCP Tools bound to Agent
+	mcpTools, err := s.mcpService.GetToolsForServers(agent.MCPServers)
+	if err == nil {
+		einoTools = append(einoTools, mcpTools...)
+	}
+
 	// Get Custom Tools (if any) - assuming agent.Tools is populated (need preload in GetByID)
 	// Currently GetByID preloads Tools, so we are good.
 	// We need to convert agent.Tools to schema.ToolInfo
@@ -589,6 +595,45 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					if agent.Mode.Key == "plan" && !strings.Contains(p, "plan") {
 					}
 					res, err := builtin.ReadFile(p)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "read_file_range":
+					path, _ := args["path"].(string)
+					startLine, _ := args["startLine"].(float64)
+					limit, _ := args["limit"].(float64)
+					
+					p, rerr := builtin.ResolvePathInBase(projectRoot, path)
+					if rerr != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr)
+						break
+					}
+					
+					res, err := builtin.ReadFileRange(p, int(startLine), int(limit))
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: %v", err)
+					} else {
+						resultStr = res
+					}
+				case "diff_file":
+					path1, _ := args["path1"].(string)
+					path2, _ := args["path2"].(string)
+					
+					p1, rerr1 := builtin.ResolvePathInBase(projectRoot, path1)
+					if rerr1 != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr1)
+						break
+					}
+					
+					p2, rerr2 := builtin.ResolvePathInBase(projectRoot, path2)
+					if rerr2 != nil {
+						resultStr = fmt.Sprintf("Error: %v", rerr2)
+						break
+					}
+					
+					res, err := builtin.DiffFile(p1, p2)
 					if err != nil {
 						resultStr = fmt.Sprintf("Error: %v", err)
 					} else {

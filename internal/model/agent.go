@@ -11,4 +11,5 @@ type Agent struct {
 	ModelID      uint   `json:"modelId"`
 	Model        AIModel `json:"-"`
 	Tools        []Tool  `json:"tools" gorm:"many2many:agent_tools;"`
+	MCPServers   []MCPServer `json:"mcpServers" gorm:"many2many:agent_mcp_servers;"`
 }

@@ -12,6 +12,7 @@ require (
 	github.com/glebarez/sqlite v1.11.0
 	github.com/google/uuid v1.6.0
 	github.com/mark3labs/mcp-go v0.43.2
+	github.com/sergi/go-diff v1.4.0
 	github.com/syndtr/goleveldb v1.0.0
 	github.com/wailsapp/wails/v2 v2.11.0
 	gorm.io/gorm v1.31.1

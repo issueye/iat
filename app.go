@@ -210,6 +210,14 @@ func (a *App) ListMCPServers() *common.Result {
 	return common.Success(servers)
 }
 
+func (a *App) ListMCPTools(id uint) *common.Result {
+	tools, err := a.mcpService.ListToolsForServer(id)
+	if err != nil {
+		return common.Fail(err.Error())
+	}
+	return common.Success(tools)
+}
+
 func (a *App) DeleteMCPServer(id uint) *common.Result {
 	err := a.mcpService.DeleteMCPServer(id)
 	if err != nil {
@@ -267,16 +275,16 @@ func (a *App) GetScriptAPIDocs() *common.Result {
 
 // --- Agent Methods ---
 
-func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint, modeID uint) *common.Result {
-	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID, toolIDs, modeID)
+func (a *App) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) *common.Result {
+	err := a.agentService.CreateAgent(name, description, systemPrompt, modelID, toolIDs, mcpServerIDs, modeID)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)
 }
 
-func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint, modeID uint) *common.Result {
-	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID, toolIDs, modeID)
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) *common.Result {
+	err := a.agentService.UpdateAgent(id, name, description, systemPrompt, modelID, toolIDs, mcpServerIDs, modeID)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
