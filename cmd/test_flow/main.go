@@ -39,7 +39,9 @@ func main() {
 	// Note: Real chat service needs real SSE handler which writes to HTTP response.
 	// Here we just test if ChatService can be created and logic runs without panic.
 	// E2E chat test is hard without real OpenAI key.
-	_ = service.NewChatService(sseHandler)
+	mcpService := service.NewMCPService()
+	taskService := service.NewTaskService(sseHandler)
+	_ = service.NewChatService(sseHandler, mcpService, taskService)
 
 	fmt.Println("--- Starting Flow Test ---")
 

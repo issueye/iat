@@ -106,48 +106,91 @@
           >
             <template #content="{ item }">
               <div v-if="item.role === ChatRoles.Tool">
-                <div
-                  style="
-                    display: flex;
-                    gap: 8px;
-                    align-items: center;
-                    justify-content: space-between;
-                  "
-                >
-                  <div style="display: flex; gap: 8px; align-items: center">
-                    <span style="font-weight: 600">工具：{{ item.toolName }}</span>
-                    <span v-if="item.toolOk === false" style="color: #d03050"
-                      >失败</span
-                    >
-                    <span v-else-if="item.toolOk === true" style="color: #18a058"
-                      >成功</span
-                    >
-                  </div>
-                  <n-button
-                    size="tiny"
-                    text
-                    @click="item.collapsed = !item.collapsed"
-                  >
-                    {{ item.collapsed ? "展开" : "收起" }}
-                  </n-button>
-                </div>
-                <div v-if="!item.collapsed" style="margin-top: 8px">
-                  <div style="font-size: 12px; color: #999; margin-bottom: 4px">
-                    参数
-                  </div>
-                  <pre class="tool-pre">{{ item.toolArguments }}</pre>
-                  <template v-if="item.toolOutput !== ''">
-                    <div
-                      style="
-                        font-size: 12px;
-                        color: #999;
-                        margin: 8px 0 4px;
-                      "
-                    >
-                      返回
+                <!-- SubAgent Display -->
+                <div v-if="item.toolName === 'call_subagent'" class="subagent-container">
+                    <div class="subagent-header" @click="item.collapsed = !item.collapsed">
+                        <div class="left">
+                            <n-tag type="info" size="small" round>SubAgent</n-tag>
+                            <span class="agent-name">{{ getSubAgentName(item) }}</span>
+                        </div>
+                        <div class="right">
+                            <n-button size="tiny" text>
+                                <template #icon><n-icon><ChevronDownOutline v-if="!item.collapsed"/><ChevronForwardOutline v-else/></n-icon></template>
+                            </n-button>
+                        </div>
                     </div>
-                    <pre class="tool-pre">{{ item.toolOutput }}</pre>
-                  </template>
+                    
+                    <n-collapse-transition :show="!item.collapsed">
+                        <div class="subagent-content">
+                             <div class="query-box">
+                                <span class="label">任务:</span>
+                                <span class="text">{{ getSubAgentQuery(item) }}</span>
+                             </div>
+                             
+                             <!-- Intermediate logs/thoughts from SubAgent (if any) -->
+                             <div v-if="item.subAgentLogs && item.subAgentLogs.length > 0" class="logs-box">
+                                <div v-for="(log, idx) in item.subAgentLogs" :key="idx" class="log-item">
+                                    {{ log }}
+                                </div>
+                             </div>
+
+                             <div v-if="item.toolOutput" class="result-box">
+                                <span class="label">结果:</span>
+                                <XMarkdown 
+                                    :markdown="item.toolOutput" 
+                                    default-theme-mode="light"
+                                    :code-x-props="{ enableCodeLineNumber: false }"
+                                />
+                             </div>
+                        </div>
+                    </n-collapse-transition>
+                </div>
+
+                <!-- Normal Tool Display -->
+                <div v-else>
+                    <div
+                    style="
+                        display: flex;
+                        gap: 8px;
+                        align-items: center;
+                        justify-content: space-between;
+                    "
+                    >
+                    <div style="display: flex; gap: 8px; align-items: center">
+                        <span style="font-weight: 600">工具：{{ item.toolName }}</span>
+                        <span v-if="item.toolOk === false" style="color: #d03050"
+                        >失败</span
+                        >
+                        <span v-else-if="item.toolOk === true" style="color: #18a058"
+                        >成功</span
+                        >
+                    </div>
+                    <n-button
+                        size="tiny"
+                        text
+                        @click="item.collapsed = !item.collapsed"
+                    >
+                        {{ item.collapsed ? "展开" : "收起" }}
+                    </n-button>
+                    </div>
+                    <div v-if="!item.collapsed" style="margin-top: 8px">
+                    <div style="font-size: 12px; color: #999; margin-bottom: 4px">
+                        参数
+                    </div>
+                    <pre class="tool-pre">{{ item.toolArguments }}</pre>
+                    <template v-if="item.toolOutput !== ''">
+                        <div
+                        style="
+                            font-size: 12px;
+                            color: #999;
+                            margin: 8px 0 4px;
+                        "
+                        >
+                        返回
+                        </div>
+                        <pre class="tool-pre">{{ item.toolOutput }}</pre>
+                    </template>
+                    </div>
                 </div>
               </div>
               <div v-else-if="item.role === ChatRoles.Assistant">
@@ -390,6 +433,8 @@ import {
   ArchiveOutline,
   ContractOutline,
   InformationCircleOutline,
+  ChevronForwardOutline,
+  ChevronDownOutline,
 } from "@vicons/ionicons5";
 import {
   ListProjects,
@@ -669,8 +714,36 @@ function handleToolEvent(tool) {
           avatar: aiAvatar,
         variant: "outlined",
         shape: "corner",
+        subAgentLogs: [], // Init subagent logs
       }) - 1;
     if (toolCallId) toolBubbleIndexByCallId.set(toolCallId, idx);
+    return;
+  }
+  
+  // Handle SubAgent Chunk
+  if (tool.stage === "subagent_chunk") {
+    // This is tricky. We need to know WHICH subagent is running.
+    // However, the event doesn't carry toolCallId because it's emitted from inside the sub-agent loop
+    // where we didn't pass toolCallId.
+    // But wait, the ChatService `sendToolEvent` uses `sessionID`.
+    // In frontend, we receive events for current session.
+    // We can assume the LAST tool call that is "call_subagent" and not finished is the target.
+    
+    // Find the last tool call that is "call_subagent" and has no output yet
+    for (let i = messages.value.length - 1; i >= 0; i--) {
+        const msg = messages.value[i];
+        if (msg.role === ChatRoles.Tool && msg.toolName === "call_subagent" && !msg.toolOutput) {
+            if (!msg.subAgentLogs) msg.subAgentLogs = [];
+            msg.subAgentLogs.push(tool.content);
+            break;
+        }
+    }
+    return;
+  }
+  
+  if (tool.stage === "subagent_start") {
+    // Just ensure the tool bubble exists (handled by Call stage usually, but might be out of sync?)
+    // Actually Call stage comes first.
     return;
   }
 
@@ -700,6 +773,24 @@ function handleToolEvent(tool) {
   }
 }
 
+
+function getSubAgentName(item) {
+    try {
+        const args = JSON.parse(item.toolArguments);
+        return args.agentName || "Unknown Agent";
+    } catch (e) {
+        return "Unknown Agent";
+    }
+}
+
+function getSubAgentQuery(item) {
+    try {
+        const args = JSON.parse(item.toolArguments);
+        return args.query || "";
+    } catch (e) {
+        return item.toolArguments;
+    }
+}
 
 // Methods
 async function loadProjects() {
@@ -1185,4 +1276,80 @@ onUnmounted(() => {
   justify-content: center;
   align-items: center;
 }
+
+.subagent-container {
+    border: 1px solid #e0e0e6;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: #fafafc;
+}
+
+.subagent-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: #f0f0f5;
+    cursor: pointer;
+    user-select: none;
+}
+
+.subagent-header .left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.subagent-header .agent-name {
+    font-weight: 600;
+    font-size: 13px;
+    color: #333;
+}
+
+.subagent-content {
+    padding: 12px;
+    background-color: #fff;
+    border-top: 1px solid #e0e0e6;
+}
+
+.subagent-content .query-box {
+    display: flex;
+    gap: 8px;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.subagent-content .label {
+    color: #999;
+    flex-shrink: 0;
+}
+
+.subagent-content .text {
+    color: #333;
+}
+
+.logs-box {
+    background-color: #f9f9f9;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: #666;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.log-item {
+    padding: 2px 0;
+    border-bottom: 1px dashed #eee;
+}
+.log-item:last-child {
+    border-bottom: none;
+}
+
+.result-box {
+    margin-top: 8px;
+}
+
 </style>

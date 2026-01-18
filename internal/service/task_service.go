@@ -23,9 +23,10 @@ func (s *TaskService) ListTasks(sessionID uint) ([]model.Task, error) {
 	return s.repo.ListBySessionID(sessionID)
 }
 
-func (s *TaskService) CreateTask(sessionID uint, content, priority string) (*model.Task, error) {
+func (s *TaskService) CreateTask(sessionID uint, content, priority string, parentID *uint) (*model.Task, error) {
 	task := &model.Task{
 		SessionID: sessionID,
+		ParentID:  parentID,
 		Content:   content,
 		Priority:  priority,
 		Status:    model.TaskStatusPending,

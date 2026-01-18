@@ -171,13 +171,30 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 	// 6. Loop
 	ctx := context.Background()
-	maxTurns := 10
+	maxTurns := 30 // Increased from 10 to allow more complex sub-agent tasks
 
 	for i := 0; i < maxTurns; i++ {
-		// Non-streaming Chat
+		// Non-streaming Chat - but we want to stream thoughts/logs if possible?
+		// RunAgentInternal is synchronous. To show progress, we might need a way to stream back to parent session.
+		// For now, let's just use Chat (non-streaming) but maybe we can emit events?
+		// We can inject sseHandler or a callback if we want real-time updates from sub-agent.
+		// But RunAgentInternal signature is fixed for now.
+		// Let's emit "subagent_log" events via s.sendToolEvent using sessionID (passed in args)
+
+		// Wait, RunAgentInternal needs to emit events to the PARENT sessionID?
+		// Yes, we passed sessionID.
+
 		resp, err := aiClient.Chat(ctx, messages)
 		if err != nil {
 			return "", err
+		}
+
+		// Emit intermediate thought/content as event
+		if resp.Content != "" {
+			s.sendToolEvent(sessionID, map[string]interface{}{
+				"stage":   "subagent_chunk",
+				"content": resp.Content,
+			})
 		}
 
 		// Check for Tool Calls
@@ -284,13 +301,19 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				id := uint(idVal)
 				status, _ := args["status"].(string)
 				priority, _ := args["priority"].(string)
+				pidVal, _ := args["parentId"].(float64)
+				var parentID *uint
+				if pidVal > 0 {
+					pid := uint(pidVal)
+					parentID = &pid
+				}
 
 				switch action {
 				case "add":
 					if priority == "" {
 						priority = "medium"
 					}
-					t, err := s.taskService.CreateTask(sessionID, content, priority)
+					t, err := s.taskService.CreateTask(sessionID, content, priority, parentID)
 					if err != nil {
 						resultStr = fmt.Sprintf("Error: %v", err)
 					} else {
@@ -1045,6 +1068,14 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					agentName, _ := args["agentName"].(string)
 					query, _ := args["query"].(string)
 
+					// Notify Start of SubAgent
+					s.sendToolEvent(sessionID, map[string]interface{}{
+						"stage":      "subagent_start",
+						"name":       "call_subagent",
+						"agentName":  agentName,
+						"toolCallId": tc.ID,
+					})
+
 					// Run Internal Agent
 					res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key)
 					if err != nil {
@@ -1052,6 +1083,10 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					} else {
 						resultStr = res
 					}
+
+					// Notify End of SubAgent (with partial content if needed, but resultStr is final)
+					// The resultStr will be sent via standard tool result event
+
 				case "manage_tasks":
 					action, _ := args["action"].(string)
 					content, _ := args["content"].(string)
@@ -1059,13 +1094,19 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					id := uint(idVal)
 					status, _ := args["status"].(string)
 					priority, _ := args["priority"].(string)
+					pidVal, _ := args["parentId"].(float64)
+					var parentID *uint
+					if pidVal > 0 {
+						pid := uint(pidVal)
+						parentID = &pid
+					}
 
 					switch action {
 					case "add":
 						if priority == "" {
 							priority = "medium"
 						}
-						t, err := s.taskService.CreateTask(sessionID, content, priority)
+						t, err := s.taskService.CreateTask(sessionID, content, priority, parentID)
 						if err != nil {
 							resultStr = fmt.Sprintf("Error: %v", err)
 						} else {

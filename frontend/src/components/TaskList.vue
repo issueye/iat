@@ -82,6 +82,7 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
           :key="task.id"
           class="task-item"
           :class="{ completed: task.status === 'completed' }"
+          :style="{ paddingLeft: (12 + (task.level || 0) * 20) + 'px' }"
         >
           <n-checkbox
             :checked="task.status === 'completed'"

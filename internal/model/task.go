@@ -12,6 +12,7 @@ const (
 type Task struct {
 	Base
 	SessionID uint       `json:"sessionId" gorm:"index"`
+	ParentID  *uint      `json:"parentId" gorm:"index"`
 	Content   string     `json:"content"`
 	Status    TaskStatus `json:"status" gorm:"default:'pending'"`
 	Priority  string     `json:"priority" gorm:"default:'medium'"` // high, medium, low

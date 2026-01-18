@@ -410,7 +410,7 @@ func (a *App) ListTasks(sessionID uint) *common.Result {
 }
 
 func (a *App) CreateTask(sessionID uint, content, priority string) *common.Result {
-	task, err := a.taskService.CreateTask(sessionID, content, priority)
+	task, err := a.taskService.CreateTask(sessionID, content, priority, nil)
 	if err != nil {
 		return common.Fail(err.Error())
 	}
