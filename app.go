@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"iat/internal/model"
 	"iat/internal/pkg/common"
@@ -15,6 +16,7 @@ import (
 // App struct
 type App struct {
 	ctx            context.Context
+	sseHandler     *sse.SSEHandler
 	projectService *service.ProjectService
 	modelService   *service.AIModelService
 	sessionService *service.SessionService
@@ -33,6 +35,7 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 	mcpService := service.NewMCPService()
 	taskService := service.NewTaskService(sseHandler)
 	return &App{
+		sseHandler:     sseHandler,
 		projectService: service.NewProjectService(),
 		modelService:   service.NewAIModelService(),
 		sessionService: service.NewSessionService(),
@@ -40,7 +43,7 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 		scriptService:  service.NewScriptService(),
 		agentService:   service.NewAgentService(),
 		toolService:    service.NewToolService(),
-		chatService:    service.NewChatService(sseHandler, mcpService, taskService),
+		chatService:    service.NewChatService(mcpService, taskService),
 		modeService:    service.NewModeService(),
 		mcpService:     mcpService,
 		taskService:    taskService,
@@ -359,8 +362,61 @@ func (a *App) DeleteTool(id uint) *common.Result {
 // --- Chat Methods ---
 
 func (a *App) SendMessage(sessionID uint, userMessage string, agentID uint, mode string) *common.Result {
-	err := a.chatService.Chat(sessionID, userMessage, agentID, mode)
+	eventChan := make(chan service.ChatEvent)
+
+	go func() {
+		for evt := range eventChan {
+			var msg map[string]interface{}
+			switch evt.Type {
+			case service.ChatEventChunk:
+				msg = map[string]interface{}{
+					"sessionId": sessionID,
+					"delta":     evt.Content,
+				}
+			case service.ChatEventError:
+				msg = map[string]interface{}{
+					"sessionId": sessionID,
+					"error":     evt.Content,
+				}
+			case service.ChatEventTerminated:
+				msg = map[string]interface{}{
+					"sessionId":  sessionID,
+					"terminated": true,
+					"done":       true,
+					"error":      "terminated",
+				}
+			case service.ChatEventDone:
+				msg = evt.Extra
+				if msg == nil {
+					msg = make(map[string]interface{})
+				}
+				msg["sessionId"] = sessionID
+				msg["done"] = true
+			case service.ChatEventUsage:
+				msg = evt.Extra
+				if msg == nil {
+					msg = make(map[string]interface{})
+				}
+				msg["sessionId"] = sessionID
+			default:
+				// Tool events and others
+				msg = evt.Extra
+				if msg == nil {
+					msg = make(map[string]interface{})
+				}
+				msg["sessionId"] = sessionID
+			}
+
+			if msg != nil {
+				jsonBytes, _ := json.Marshal(msg)
+				a.sseHandler.Send(string(jsonBytes))
+			}
+		}
+	}()
+
+	err := a.chatService.Chat(sessionID, userMessage, agentID, mode, eventChan)
 	if err != nil {
+		close(eventChan)
 		return common.Fail(err.Error())
 	}
 	return common.Success(nil)

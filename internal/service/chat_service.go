@@ -7,7 +7,6 @@ import (
 	"iat/internal/model"
 	"iat/internal/pkg/ai"
 	"iat/internal/pkg/consts"
-	"iat/internal/pkg/sse"
 	"iat/internal/pkg/tools/builtin"
 	"iat/internal/pkg/tools/script"
 	"iat/internal/repo"
@@ -51,7 +50,6 @@ type ChatService struct {
 	modelRepo   *repo.AIModelRepo
 	messageRepo *repo.MessageRepo
 	toolRepo    *repo.ToolInvocationRepo
-	sseHandler  *sse.SSEHandler
 	mcpService  *MCPService
 	taskService *TaskService
 	mu          sync.Mutex
@@ -59,7 +57,7 @@ type ChatService struct {
 	cancelBySID map[uint]sessionCancel
 }
 
-func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService, taskService *TaskService) *ChatService {
+func NewChatService(mcpService *MCPService, taskService *TaskService) *ChatService {
 	return &ChatService{
 		projectRepo: repo.NewProjectRepo(),
 		sessionRepo: repo.NewSessionRepo(),
@@ -67,22 +65,18 @@ func NewChatService(sseHandler *sse.SSEHandler, mcpService *MCPService, taskServ
 		modelRepo:   repo.NewAIModelRepo(),
 		messageRepo: repo.NewMessageRepo(),
 		toolRepo:    repo.NewToolInvocationRepo(),
-		sseHandler:  sseHandler,
 		mcpService:  mcpService,
 		taskService: taskService,
 		cancelBySID: make(map[uint]sessionCancel),
 	}
 }
 
-func (s *ChatService) sendToolEvent(sessionID uint, payload map[string]interface{}) {
-	msg, err := json.Marshal(map[string]interface{}{
-		"sessionId": sessionID,
-		"tool":      payload,
-	})
-	if err != nil {
-		return
+func (s *ChatService) sendToolEvent(sessionID uint, payload map[string]interface{}, eventChan chan<- ChatEvent) {
+	// Construct generic event
+	eventChan <- ChatEvent{
+		Type:  ChatEventToolCall, // Generic tool event type
+		Extra: payload,
 	}
-	s.sseHandler.Send(string(msg))
 }
 
 // ListMessages returns history messages for a session
@@ -100,7 +94,7 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 }
 
 // RunAgentInternal runs an agent synchronously for internal calls (like sub-agents)
-func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string) (string, error) {
+func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, eventChan chan<- ChatEvent) (string, error) {
 	// 1. Find Agent
 	agents, err := s.agentRepo.List() // TODO: Optimize by Name lookup
 	if err != nil {
@@ -120,9 +114,6 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	// Permission Check
 	effectiveMode := targetAgent.Mode.Key
 	if modeKey != "" {
-		// Inherit mode? Or use agent's mode?
-		// Usually sub-agent runs in its own mode, but maybe constrained by parent.
-		// Let's use agent's own mode for now.
 		effectiveMode = targetAgent.Mode.Key
 	}
 
@@ -171,19 +162,9 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 	// 6. Loop
 	ctx := context.Background()
-	maxTurns := 30 // Increased from 10 to allow more complex sub-agent tasks
+	maxTurns := 30 
 
 	for i := 0; i < maxTurns; i++ {
-		// Non-streaming Chat - but we want to stream thoughts/logs if possible?
-		// RunAgentInternal is synchronous. To show progress, we might need a way to stream back to parent session.
-		// For now, let's just use Chat (non-streaming) but maybe we can emit events?
-		// We can inject sseHandler or a callback if we want real-time updates from sub-agent.
-		// But RunAgentInternal signature is fixed for now.
-		// Let's emit "subagent_log" events via s.sendToolEvent using sessionID (passed in args)
-
-		// Wait, RunAgentInternal needs to emit events to the PARENT sessionID?
-		// Yes, we passed sessionID.
-
 		resp, err := aiClient.Chat(ctx, messages)
 		if err != nil {
 			return "", err
@@ -191,10 +172,12 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 		// Emit intermediate thought/content as event
 		if resp.Content != "" {
-			s.sendToolEvent(sessionID, map[string]interface{}{
-				"stage":   "subagent_chunk",
-				"content": resp.Content,
-			})
+			if eventChan != nil {
+				s.sendToolEvent(sessionID, map[string]interface{}{
+					"stage":   "subagent_chunk",
+					"content": resp.Content,
+				}, eventChan)
+			}
 		}
 
 		// Check for Tool Calls
@@ -221,14 +204,6 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 			}
 
 			resultStr := ""
-			// Reuse builtin execution logic?
-			// We should extract the tool execution logic to a shared method `ExecuteTool`.
-			// For now, let's just handle a subset or copy logic to avoid huge refactor risk in this turn.
-			// Ideally, `ExecuteTool` should be shared.
-
-			// Quick Hack: Copy essential builtins + MCP + Script
-			// Note: This duplicates code from Chat method.
-
 			handled := false
 
 			// Builtins
@@ -289,7 +264,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				an, _ := args["agentName"].(string)
 				q, _ := args["query"].(string)
 				var subErr error
-				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode)
+				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode, eventChan)
 				if subErr != nil {
 					resultStr = fmt.Sprintf("Error calling sub-agent: %v", subErr)
 				}
@@ -508,7 +483,7 @@ func (s *ChatService) AbortSession(sessionID uint) {
 }
 
 // Chat handles the main chat logic
-func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, modeKey string) error {
+func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, modeKey string, eventChan chan<- ChatEvent) error {
 	// 1. Get Session
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
@@ -701,13 +676,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 
 		for i := 0; i < maxTurns; i++ {
 			if ctx.Err() != nil {
-				termMsg, _ := json.Marshal(map[string]interface{}{
-					"sessionId":  sessionID,
-					"terminated": true,
-					"done":       true,
-					"error":      "terminated",
-				})
-				s.sseHandler.Send(string(termMsg))
+				eventChan <- ChatEvent{Type: ChatEventTerminated}
 				return
 			}
 			// Create a copy of messages to avoid race conditions if needed,
@@ -724,11 +693,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 
 			stream, err := aiClient.StreamChat(ctx, messages)
 			if err != nil {
-				errMsg, _ := json.Marshal(map[string]interface{}{
-					"sessionId": sessionID,
-					"error":     err.Error(),
-				})
-				s.sseHandler.Send(string(errMsg))
+				eventChan <- ChatEvent{Type: ChatEventError, Content: err.Error()}
 				return
 			}
 
@@ -749,11 +714,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 				// Handle Content
 				if chunk.Content != "" {
 					fullResponse += chunk.Content
-					msg, _ := json.Marshal(map[string]interface{}{
-						"sessionId": sessionID,
-						"delta":     chunk.Content,
-					})
-					s.sseHandler.Send(string(msg))
+					eventChan <- ChatEvent{Type: ChatEventChunk, Content: chunk.Content}
 				}
 
 				// Handle Tool Calls (Accumulate)
@@ -793,13 +754,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 			}
 			stream.Close()
 			if ctx.Err() != nil {
-				termMsg, _ := json.Marshal(map[string]interface{}{
-					"sessionId":  sessionID,
-					"terminated": true,
-					"done":       true,
-					"error":      "terminated",
-				})
-				s.sseHandler.Send(string(termMsg))
+				eventChan <- ChatEvent{Type: ChatEventTerminated}
 				return
 			}
 
@@ -827,11 +782,10 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 
 				s.messageRepo.Create(aiMsg)
 				totalTokens += aiMsg.TokenCount
-				usageMsg, _ := json.Marshal(map[string]interface{}{
-					"sessionId": sessionID,
-					"usage":     aiMsg.TokenCount,
-				})
-				s.sseHandler.Send(string(usageMsg))
+				eventChan <- ChatEvent{
+					Type: ChatEventUsage,
+					Extra: map[string]interface{}{"usage": aiMsg.TokenCount},
+				}
 
 				// Append to conversation context for next turn
 				messages = append(messages, &schema.Message{
@@ -844,12 +798,10 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 			// If no tool calls, we are done
 			if len(toolCalls) == 0 {
 				// Send done signal
-				doneMsg, _ := json.Marshal(map[string]interface{}{
-					"sessionId": sessionID,
-					"done":      true,
-					"usage":     totalTokens,
-				})
-				s.sseHandler.Send(string(doneMsg))
+				eventChan <- ChatEvent{
+					Type: ChatEventDone,
+					Extra: map[string]interface{}{"usage": totalTokens},
+				}
 				return
 			}
 
@@ -865,7 +817,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					"name":       fnName,
 					"arguments":  fnArgs,
 					"toolCallId": tc.ID,
-				})
+				}, eventChan)
 				// ... (upsert calls)
 				if err := s.toolRepo.UpsertCall(sessionID, tc.ID, fnName, fnArgs); err != nil {
 					fmt.Printf("[ChatService] Failed to upsert tool call to repo: %v\n", err)
@@ -884,7 +836,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 						"toolCallId": tc.ID,
 						"ok":         false,
 						"output":     output,
-					})
+					}, eventChan)
 					_ = s.toolRepo.UpsertResult(sessionID, tc.ID, fnName, output, false)
 					_ = s.messageRepo.UpsertToolResult(sessionID, tc.ID, fnName, output, false)
 					messages = append(messages, &schema.Message{
@@ -1074,10 +1026,10 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 						"name":       "call_subagent",
 						"agentName":  agentName,
 						"toolCallId": tc.ID,
-					})
+					}, eventChan)
 
 					// Run Internal Agent
-					res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key)
+					res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key, eventChan)
 					if err != nil {
 						resultStr = fmt.Sprintf("Error calling sub-agent '%s': %v", agentName, err)
 					} else {
@@ -1215,7 +1167,7 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					"toolCallId": tc.ID,
 					"ok":         ok,
 					"output":     resultStr,
-				})
+				}, eventChan)
 
 				// 4. Append Tool Message
 				messages = append(messages, &schema.Message{

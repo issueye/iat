@@ -41,7 +41,7 @@ func main() {
 	// E2E chat test is hard without real OpenAI key.
 	mcpService := service.NewMCPService()
 	taskService := service.NewTaskService(sseHandler)
-	_ = service.NewChatService(sseHandler, mcpService, taskService)
+	_ = service.NewChatService(mcpService, taskService)
 
 	fmt.Println("--- Starting Flow Test ---")
 

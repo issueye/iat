@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package service;
+
+option go_package = "iat/pkg/pb/service";
+
+import "api/proto/model.proto";
+
+message Empty {}
+message IDRequest {
+    uint32 id = 1;
+}
+
+// --- Project Service ---
+service ProjectService {
+    rpc CreateProject(CreateProjectRequest) returns (model.Base);
+    rpc UpdateProject(UpdateProjectRequest) returns (model.Base);
+    rpc DeleteProject(IDRequest) returns (Empty);
+    rpc ListProjects(Empty) returns (ListProjectsResponse);
+    rpc GetProject(IDRequest) returns (model.Project);
+}
+
+message CreateProjectRequest {
+    string name = 1;
+    string description = 2;
+    string path = 3;
+}
+
+message UpdateProjectRequest {
+    uint32 id = 1;
+    string name = 2;
+    string description = 3;
+    string path = 4;
+}
+
+message ListProjectsResponse {
+    repeated model.Project projects = 1;
+}
+
+// --- Chat Service ---
+service ChatService {
+    rpc Chat(ChatRequest) returns (stream ChatEvent);
+    rpc ListMessages(IDRequest) returns (ListMessagesResponse); // session_id
+    rpc ClearMessages(IDRequest) returns (Empty); // session_id
+    rpc CreateSession(CreateSessionRequest) returns (model.Base);
+    rpc ListSessions(IDRequest) returns (ListSessionsResponse); // project_id
+    rpc DeleteSession(IDRequest) returns (Empty);
+}
+
+message ChatRequest {
+    uint32 session_id = 1;
+    string user_message = 2;
+    uint32 agent_id = 3;
+    string mode = 4;
+}
+
+message ChatEvent {
+    string type = 1; // "chunk", "tool_start", "tool_end", "error", "done"
+    string content = 2; // for chunk/error
+    string extra = 3; // JSON for tool details etc.
+}
+
+message ListMessagesResponse {
+    repeated model.Message messages = 1;
+}
+
+message CreateSessionRequest {
+    uint32 project_id = 1;
+    string name = 2;
+    uint32 agent_id = 3;
+}
+
+message ListSessionsResponse {
+    repeated model.Session sessions = 1;
+}
+
+// --- Task Service ---
+service TaskService {
+    rpc CreateTask(CreateTaskRequest) returns (model.Task);
+    rpc UpdateTask(UpdateTaskRequest) returns (Empty);
+    rpc DeleteTask(IDRequest) returns (Empty);
+    rpc ListTasks(IDRequest) returns (ListTasksResponse); // session_id
+}
+
+message CreateTaskRequest {
+    uint32 session_id = 1;
+    string content = 2;
+    string priority = 3;
+    uint32 parent_id = 4; // 0 if none
+}
+
+message UpdateTaskRequest {
+    uint32 id = 1;
+    string status = 2;
+}
+
+message ListTasksResponse {
+    repeated model.Task tasks = 1;
+}
+
+// --- Agent Service ---
+service AgentService {
+    rpc CreateAgent(CreateAgentRequest) returns (model.Base);
+    rpc UpdateAgent(UpdateAgentRequest) returns (model.Base);
+    rpc DeleteAgent(IDRequest) returns (Empty);
+    rpc ListAgents(Empty) returns (ListAgentsResponse);
+}
+
+message CreateAgentRequest {
+    string name = 1;
+    string description = 2;
+    string system_prompt = 3;
+    uint32 model_id = 4;
+    repeated uint32 tool_ids = 5;
+    repeated uint32 mcp_server_ids = 6;
+    uint32 mode_id = 7;
+}
+
+message UpdateAgentRequest {
+    uint32 id = 1;
+    string name = 2;
+    string description = 3;
+    string system_prompt = 4;
+    uint32 model_id = 5;
+    repeated uint32 tool_ids = 6;
+    repeated uint32 mcp_server_ids = 7;
+    uint32 mode_id = 8;
+}
+
+message ListAgentsResponse {
+    repeated model.Agent agents = 1;
+}
+
+// --- MCP Service ---
+service MCPService {
+    rpc CreateMCPServer(CreateMCPServerRequest) returns (model.Base);
+    rpc UpdateMCPServer(UpdateMCPServerRequest) returns (model.Base);
+    rpc DeleteMCPServer(IDRequest) returns (Empty);
+    rpc ListMCPServers(Empty) returns (ListMCPServersResponse);
+    rpc ListMCPTools(IDRequest) returns (ListMCPToolsResponse); // server_id
+}
+
+message CreateMCPServerRequest {
+    string name = 1;
+    string description = 2;
+    string type = 3;
+    string command = 4;
+    string args = 5;
+    string env = 6;
+    string url = 7;
+}
+
+message UpdateMCPServerRequest {
+    uint32 id = 1;
+    string name = 2;
+    string description = 3;
+    string type = 4;
+    string command = 5;
+    string args = 6;
+    string env = 7;
+    string url = 8;
+    bool enabled = 9;
+}
+
+message ListMCPServersResponse {
+    repeated model.MCPServer servers = 1;
+}
+
+message ListMCPToolsResponse {
+    repeated ToolInfo tools = 1;
+}
+
+message ToolInfo {
+    string name = 1;
+    string desc = 2;
+    // Schema is complex, maybe just return JSON string
+    string schema_json = 3;
+}

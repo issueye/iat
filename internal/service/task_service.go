@@ -64,6 +64,9 @@ func (s *TaskService) DeleteTask(id uint) error {
 }
 
 func (s *TaskService) notifyTasksUpdate(sessionID uint) {
+	if s.sseHandler == nil {
+		return
+	}
 	tasks, _ := s.repo.ListBySessionID(sessionID)
 	msg, _ := json.Marshal(map[string]interface{}{
 		"sessionId": sessionID,
