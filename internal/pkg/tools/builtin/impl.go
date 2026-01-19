@@ -212,30 +212,24 @@ func RunCommand(command string, args []string) (string, error) {
 		return "", fmt.Errorf("command is required")
 	}
 
-	useShell := false
-	if len(args) == 0 {
-		if strings.ContainsAny(command, "&|;<>\n\r\t") || strings.Contains(command, "&&") || strings.Contains(command, "||") {
-			useShell = true
-		} else {
-			for _, r := range command {
-				if r == ' ' {
-					useShell = true
-					break
-				}
-			}
-		}
+	// Always use shell to support aliases and built-ins
+	var cmd *exec.Cmd
+	
+	// Construct full command string for shell execution
+	var fullCmdBuilder strings.Builder
+	fullCmdBuilder.WriteString(command)
+	for _, arg := range args {
+		fullCmdBuilder.WriteString(" ")
+		fullCmdBuilder.WriteString(arg)
+	}
+	fullCmd := fullCmdBuilder.String()
+
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", fullCmd)
+	} else {
+		cmd = exec.Command("sh", "-lc", fullCmd)
 	}
 
-	var cmd *exec.Cmd
-	if useShell {
-		if runtime.GOOS == "windows" {
-			cmd = exec.Command("powershell", "-NoProfile", "-NonInteractive", "-Command", command)
-		} else {
-			cmd = exec.Command("sh", "-lc", command)
-		}
-	} else {
-		cmd = exec.Command(command, args...)
-	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(output), fmt.Errorf("command failed: %v, output: %s", err, string(output))

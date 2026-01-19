@@ -43,6 +43,7 @@ func InitDB() error {
 		&model.Tool{},
 		&model.Mode{},
 		&model.MCPServer{},
+		&model.Task{},
 	)
 	if err != nil {
 		return err

@@ -194,6 +194,7 @@ func (a *App) CreateMCPServer(name, description, serverType, command, args, env,
 	if err != nil {
 		return common.Fail(err.Error())
 	}
+
 	return common.Success(nil)
 }
 
@@ -202,6 +203,7 @@ func (a *App) UpdateMCPServer(id uint, name, description, serverType, command, a
 	if err != nil {
 		return common.Fail(err.Error())
 	}
+
 	return common.Success(nil)
 }
 
