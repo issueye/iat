@@ -74,6 +74,30 @@
             style="width: 120px"
             size="small"
           />
+          <n-button
+            size="small"
+            type="error"
+            secondary
+            @click="handleClear"
+            :disabled="!currentSessionId"
+          >
+            <template #icon>
+              <n-icon><TrashOutline /></n-icon>
+            </template>
+            清空上下文
+          </n-button>
+          <n-button
+            size="small"
+            type="warning"
+            secondary
+            @click="handleStop"
+            :disabled="!isGenerating"
+          >
+            <template #icon>
+              <n-icon><StopCircleOutline /></n-icon>
+            </template>
+            停止
+          </n-button>
         </div>
       </div>
 
@@ -335,6 +359,37 @@ watch(currentSessionId, async (newVal) => {
 });
 
 // Methods
+async function handleClear() {
+    if (!currentSessionId.value) return;
+    dialog.warning({
+        title: "清空上下文",
+        content: "确定要清空当前会话的所有消息吗？这不会删除会话本身。",
+        positiveText: "确定",
+        negativeText: "取消",
+        onPositiveClick: async () => {
+            try {
+                await api.clearSessionMessages(currentSessionId.value);
+                messages.value = [];
+                message.success("上下文已清空");
+            } catch (e) {
+                message.error("清空失败: " + e.message);
+            }
+        }
+    });
+}
+
+async function handleStop() {
+    if (!currentSessionId.value || !isGenerating.value) return;
+    try {
+        await api.abortSession(currentSessionId.value);
+        message.info("已请求停止生成");
+        isGenerating.value = false;
+        generationStatus.value = ThinkingStatuses.Cancel;
+    } catch (e) {
+        message.error("停止失败: " + e.message);
+    }
+}
+
 async function loadProjects() {
     try {
         const data = await api.listProjects();

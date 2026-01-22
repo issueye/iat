@@ -124,10 +124,37 @@ func (h *SessionHandler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Method == http.MethodDelete {
+		if err := h.chatSvc.ClearMessages(uint(id)); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
 	msgs, err := h.chatSvc.ListMessages(uint(id))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	json.NewEncoder(w).Encode(msgs)
+}
+
+func (h *SessionHandler) Abort(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	// /api/sessions/{id}/abort
+	parts := strings.Split(path, "/")
+	if len(parts) < 5 {
+		http.Error(w, "Invalid URL", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(parts[3])
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	h.chatSvc.AbortSession(uint(id))
+	w.WriteHeader(http.StatusOK)
 }

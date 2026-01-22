@@ -50,6 +50,14 @@ export const api = {
     const resp = await client.get(`/sessions/${id}/messages`);
     return resp.data;
   },
+  clearSessionMessages: async (id: number) => {
+      const resp = await client.delete(`/sessions/${id}/messages`);
+      return resp.data;
+  },
+  abortSession: async (id: number) => {
+      const resp = await client.post(`/sessions/${id}/abort`);
+      return resp.data;
+  },
 
   // Note: Chat stream is handled via EventSource or fetch stream manually
 };

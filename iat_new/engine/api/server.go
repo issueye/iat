@@ -212,8 +212,18 @@ func (s *Server) Start() error {
 		path := r.URL.Path
 		if strings.HasSuffix(path, "/messages") {
 			// /api/sessions/{id}/messages
-			if r.Method == http.MethodGet {
+			if r.Method == http.MethodGet || r.Method == http.MethodDelete {
 				sessionHandler.ListMessages(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
+		if strings.HasSuffix(path, "/abort") {
+			// /api/sessions/{id}/abort
+			if r.Method == http.MethodPost {
+				sessionHandler.Abort(w, r)
 			} else {
 				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			}
