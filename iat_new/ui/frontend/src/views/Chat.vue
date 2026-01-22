@@ -1,7 +1,155 @@
+<template>
+  <div class="chat-container">
+    <!-- Left Sidebar: Sessions -->
+    <div class="chat-sidebar">
+      <div class="sidebar-header">
+        <n-select
+          v-model:value="currentProjectId"
+          :options="projectOptions"
+          placeholder="选择项目"
+          size="small"
+        />
+        <n-button
+          block
+          dashed
+          style="margin-top: 8px"
+          @click="showCreateModal = true"
+          :disabled="!currentProjectId"
+        >
+          <template #icon>
+            <n-icon><InformationCircleOutline /></n-icon>
+          </template>
+          新建会话
+        </n-button>
+      </div>
+      
+      <div class="session-search">
+        <n-input
+          v-model:value="sessionSearchQuery"
+          placeholder="搜索会话..."
+          size="small"
+          clearable
+        >
+          <template #prefix>
+            <n-icon><InformationCircleOutline /></n-icon>
+          </template>
+        </n-input>
+      </div>
+
+      <div class="session-list">
+        <div
+          v-for="session in displaySessions"
+          :key="session.id"
+          class="session-item"
+          :class="{ active: currentSessionId === session.id }"
+          @click="currentSessionId = session.id"
+        >
+          <div class="session-name">{{ session.name }}</div>
+          <div class="session-time">
+            {{ new Date(session.createdAt).toLocaleString() }}
+          </div>
+        </div>
+        <div v-if="displaySessions.length === 0" class="empty-sessions">
+          无会话
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Main: Chat -->
+    <div class="chat-main">
+      <div class="chat-header-bar">
+        <div class="header-controls">
+          <n-select
+            v-model:value="currentChatAgentId"
+            :options="agentOptions"
+            placeholder="选择智能体"
+            style="width: 200px"
+            size="small"
+            clearable
+          />
+          <n-select
+            v-model:value="currentChatMode"
+            :options="modeOptions"
+            placeholder="模式"
+            style="width: 120px"
+            size="small"
+          />
+        </div>
+      </div>
+
+      <div class="messages-area">
+        <div v-for="(msg, index) in messages" :key="index" class="message-item">
+          <div class="message-role">
+            <n-tag size="small" :type="msg.role === 'user' ? 'primary' : 'success'">
+              {{ msg.role }}
+            </n-tag>
+            <span class="message-time">{{ new Date(msg.createdAt).toLocaleTimeString() }}</span>
+          </div>
+          <div class="message-content">
+            <pre class="content-pre">{{ msg.content }}</pre>
+            
+            <!-- Tool Calls -->
+            <div v-if="msg.role === 'tool'" class="tool-call">
+              <div class="tool-header">
+                Tool: {{ msg.toolName }}
+              </div>
+              <pre class="tool-args">{{ msg.toolArguments }}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <n-input
+          v-model:value="inputText"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          placeholder="输入消息... (Ctrl+Enter 发送)"
+          @keydown.ctrl.enter="handleSend(inputText)"
+        />
+        <n-button
+          type="primary"
+          class="send-btn"
+          @click="handleSend(inputText)"
+          :loading="isGenerating"
+          :disabled="!inputText.trim() && !isGenerating"
+        >
+          <template #icon>
+            <n-icon><ChevronForwardOutline /></n-icon>
+          </template>
+          发送
+        </n-button>
+      </div>
+    </div>
+
+    <!-- Create Session Modal -->
+    <n-modal
+      v-model:show="showCreateModal"
+      preset="dialog"
+      title="新建会话"
+      positive-text="创建"
+      negative-text="取消"
+      @positive-click="async () => {
+        if(!newSessionName) return;
+        try {
+           await api.createSession(newSessionName, currentProjectId, currentChatAgentId || 0);
+           await loadSessions(currentProjectId);
+           showCreateModal = false;
+           newSessionName = '';
+        } catch(e) {
+           message.error(e.message);
+        }
+      }"
+    >
+      <n-input v-model:value="newSessionName" placeholder="会话名称" autofocus />
+    </n-modal>
+  </div>
+</template>
+
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useMessage, useDialog, NIcon } from "naive-ui";
+import { useMessage, useDialog, NIcon, NInput, NButton, NSelect, NTag, NModal } from "naive-ui";
 import {
   TrashOutline,
   ArchiveOutline,
@@ -317,7 +465,125 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Reuse existing styles */
+.chat-container {
+  display: flex;
+  height: calc(100vh - 40px); /* Adjust based on layout */
+  background-color: #fff;
+}
+
+.chat-sidebar {
+  width: 260px;
+  border-right: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+
+.sidebar-header {
+  margin-bottom: 10px;
+}
+
+.session-search {
+  margin-bottom: 10px;
+}
+
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.session-item {
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  margin-bottom: 4px;
+}
+
+.session-item:hover {
+  background-color: #f5f5f5;
+}
+
+.session-item.active {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.session-name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+
+.chat-header-bar {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.header-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: #fafafa;
+  margin-bottom: 10px;
+  border-radius: 4px;
+}
+
+.message-item {
+  margin-bottom: 16px;
+}
+
+.message-role {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-time {
+  font-size: 12px;
+  color: #ccc;
+}
+
+.content-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  font-family: inherit;
+  margin: 0;
+}
+
+.input-area {
+  display: flex;
+  gap: 10px;
+}
+
+.send-btn {
+  height: auto;
+}
+
 .tool-pre {
   margin: 0;
   padding: 8px 10px;
