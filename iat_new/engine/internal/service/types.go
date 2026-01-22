@@ -15,7 +15,7 @@ const (
 )
 
 type ChatEvent struct {
-	Type    ChatEventType
-	Content string
-	Extra   map[string]interface{}
+	Type    ChatEventType          `json:"type"`
+	Content string                 `json:"content"`
+	Extra   map[string]interface{} `json:"extra,omitempty"`
 }
