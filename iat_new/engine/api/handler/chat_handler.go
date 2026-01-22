@@ -3,9 +3,10 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"iat/engine/internal/service"
 	"net/http"
 	"strconv"
-	"iat/engine/internal/service"
+	"time"
 )
 
 type ChatHandler struct {
@@ -64,17 +65,36 @@ func (h *ChatHandler) Stream(w http.ResponseWriter, r *http.Request) {
 	// Start Chat in background
 	go func() {
 		defer close(eventChan)
-		if err := h.svc.Chat(req.SessionID, req.Message, req.AgentID, req.Mode, eventChan); err != nil {
+		// Pass r.Context() to ensure cancellation if client disconnects
+		if err := h.svc.Chat(r.Context(), req.SessionID, req.Message, req.AgentID, req.Mode, eventChan); err != nil {
 			eventChan <- service.ChatEvent{Type: service.ChatEventError, Content: err.Error()}
 		}
 	}()
 
-	// Stream events
-	for event := range eventChan {
-		data, _ := json.Marshal(event)
-		fmt.Fprintf(w, "data: %s\n\n", data)
-		if f, ok := w.(http.Flusher); ok {
-			f.Flush()
+	// Stream events with heartbeat
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case event, ok := <-eventChan:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(event)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-ticker.C:
+			// Send heartbeat comment
+			fmt.Fprintf(w, ": keep-alive\n\n")
+			if f, ok := w.(http.Flusher); ok {
+				f.Flush()
+			}
+		case <-r.Context().Done():
+			// Client disconnected
+			return
 		}
 	}
 }

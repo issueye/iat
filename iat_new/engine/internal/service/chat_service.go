@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"iat/common/model"
-	"iat/engine/pkg/ai"
 	"iat/common/pkg/consts"
+	"iat/engine/internal/repo"
+	"iat/engine/pkg/ai"
 	"iat/engine/pkg/tools/builtin"
 	"iat/engine/pkg/tools/script"
-	"iat/engine/internal/repo"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -483,7 +483,7 @@ func (s *ChatService) AbortSession(sessionID uint) {
 }
 
 // Chat handles the main chat logic
-func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, modeKey string, eventChan chan<- ChatEvent) error {
+func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage string, agentID uint, modeKey string, eventChan chan<- ChatEvent) error {
 	// 1. Get Session
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
@@ -652,7 +652,8 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 
 	// 6. Stream Chat
 	// Run synchronously (caller handles concurrency)
-	ctx, cancel := context.WithCancel(context.Background())
+	// Derive context from caller's context (e.g. HTTP request)
+	ctx, cancel := context.WithCancel(ctx)
 	genID := atomic.AddUint64(&s.genCounter, 1)
 	s.mu.Lock()
 	if prev, ok := s.cancelBySID[sessionID]; ok && prev.cancel != nil {
