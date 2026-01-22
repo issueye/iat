@@ -1,6 +1,6 @@
 module iat/common
 
-go 1.21
+go 1.24
 
 require gorm.io/gorm v1.25.12
 
