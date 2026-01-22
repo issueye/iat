@@ -8,44 +8,46 @@ import (
 	"iat/engine/internal/service"
 )
 
-type ProjectHandler struct {
-	svc      *service.ProjectService
-	indexSvc *service.IndexService
+type MCPHandler struct {
+	svc *service.MCPService
 }
 
-func NewProjectHandler(svc *service.ProjectService, indexSvc *service.IndexService) *ProjectHandler {
-	return &ProjectHandler{svc: svc, indexSvc: indexSvc}
+func NewMCPHandler(svc *service.MCPService) *MCPHandler {
+	return &MCPHandler{svc: svc}
 }
 
-func (h *ProjectHandler) List(w http.ResponseWriter, r *http.Request) {
-	projects, err := h.svc.ListProjects()
+func (h *MCPHandler) List(w http.ResponseWriter, r *http.Request) {
+	servers, err := h.svc.ListMCPServers()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(projects)
+	json.NewEncoder(w).Encode(servers)
 }
 
-func (h *ProjectHandler) Create(w http.ResponseWriter, r *http.Request) {
+func (h *MCPHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
-		Path        string `json:"path"`
+		ServerType  string `json:"serverType"`
+		Command     string `json:"command"`
+		Args        string `json:"args"`
+		Env         string `json:"env"`
+		URL         string `json:"url"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.svc.CreateProject(req.Name, req.Description, req.Path); err != nil {
+	if err := h.svc.CreateMCPServer(req.Name, req.Description, req.ServerType, req.Command, req.Args, req.Env, req.URL); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
+func (h *MCPHandler) Update(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	// /api/projects/{id}
 	parts := strings.Split(path, "/")
 	if len(parts) < 4 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -60,23 +62,26 @@ func (h *ProjectHandler) Update(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Name        string `json:"name"`
 		Description string `json:"description"`
-		Path        string `json:"path"`
+		ServerType  string `json:"serverType"`
+		Command     string `json:"command"`
+		Args        string `json:"args"`
+		Env         string `json:"env"`
+		URL         string `json:"url"`
+		Enabled     bool   `json:"enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-
-	if err := h.svc.UpdateProject(uint(id), req.Name, req.Description, req.Path); err != nil {
+	if err := h.svc.UpdateMCPServer(uint(id), req.Name, req.Description, req.ServerType, req.Command, req.Args, req.Env, req.URL, req.Enabled); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
+func (h *MCPHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	// /api/projects/{id}
 	parts := strings.Split(path, "/")
 	if len(parts) < 4 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
@@ -88,18 +93,17 @@ func (h *ProjectHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.svc.DeleteProject(uint(id)); err != nil {
+	if err := h.svc.DeleteMCPServer(uint(id)); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *ProjectHandler) Index(w http.ResponseWriter, r *http.Request) {
+func (h *MCPHandler) ListTools(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
-	// /api/projects/{id}/index
 	parts := strings.Split(path, "/")
-	if len(parts) < 4 {
+	if len(parts) < 5 {
 		http.Error(w, "Invalid ID", http.StatusBadRequest)
 		return
 	}
@@ -109,19 +113,10 @@ func (h *ProjectHandler) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := h.indexSvc.IndexProject(uint(id))
+	tools, err := h.svc.ListToolsForServer(uint(id))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(res)
-}
-
-func (h *ProjectHandler) IndexAll(w http.ResponseWriter, r *http.Request) {
-	res, err := h.indexSvc.IndexAllProjects()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(res)
+	json.NewEncoder(w).Encode(tools)
 }
