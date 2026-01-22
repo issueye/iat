@@ -247,3 +247,33 @@ func (a *App) ListMCPTools(id uint) *result.Result {
 func (a *App) ListModes() *result.Result {
 	return a.proxyRequest(http.MethodGet, "/modes", nil)
 }
+
+// --- Session Methods ---
+
+func (a *App) ListSessions(projectId uint) *result.Result {
+	return a.proxyRequest(http.MethodGet, fmt.Sprintf("/sessions?projectId=%d", projectId), nil)
+}
+
+func (a *App) CreateSession(name string, projectId uint, agentId uint) *result.Result {
+	payload := map[string]interface{}{
+		"name":      name,
+		"projectId": projectId,
+		"agentId":   agentId,
+	}
+	return a.proxyRequest(http.MethodPost, "/sessions", payload)
+}
+
+func (a *App) UpdateSession(id uint, name string) *result.Result {
+	payload := map[string]interface{}{
+		"name": name,
+	}
+	return a.proxyRequest(http.MethodPut, fmt.Sprintf("/sessions/%d", id), payload)
+}
+
+func (a *App) DeleteSession(id uint) *result.Result {
+	return a.proxyRequest(http.MethodDelete, fmt.Sprintf("/sessions/%d", id), nil)
+}
+
+func (a *App) GetSessionMessages(id uint) *result.Result {
+	return a.proxyRequest(http.MethodGet, fmt.Sprintf("/sessions/%d/messages", id), nil)
+}

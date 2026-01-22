@@ -159,6 +159,33 @@ const displaySessions = computed(() => {
 // Event Source
 let eventSource = null;
 
+watch(currentProjectId, (newVal) => {
+    if (newVal) {
+        loadSessions(newVal);
+        currentSessionId.value = null;
+        messages.value = [];
+    }
+});
+
+watch(currentSessionId, async (newVal) => {
+    if (newVal) {
+        try {
+            const msgs = await api.getSessionMessages(newVal);
+            // Convert backend message format to UI format
+            messages.value = (msgs || []).map(m => ({
+                role: m.role,
+                content: m.content,
+                createdAt: m.createdAt,
+                // Handle tool calls if needed
+            }));
+        } catch (e) {
+            message.error("加载消息失败: " + e.message);
+        }
+    } else {
+        messages.value = [];
+    }
+});
+
 // Methods
 async function loadProjects() {
     try {

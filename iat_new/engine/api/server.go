@@ -24,6 +24,7 @@ func (s *Server) Start() error {
 	mcpSvc := service.NewMCPService()
 	taskSvc := service.NewTaskService(nil) // TODO: Handle SSE for tasks
 	chatSvc := service.NewChatService(mcpSvc, taskSvc)
+	sessionSvc := service.NewSessionService()
 	modelSvc := service.NewAIModelService()
 	agentSvc := service.NewAgentService()
 	toolSvc := service.NewToolService()
@@ -32,6 +33,7 @@ func (s *Server) Start() error {
 	// Initialize Handlers
 	projectHandler := handler.NewProjectHandler(projectSvc, indexSvc)
 	chatHandler := handler.NewChatHandler(chatSvc)
+	sessionHandler := handler.NewSessionHandler(sessionSvc, chatSvc)
 	modelHandler := handler.NewAIModelHandler(modelSvc)
 	agentHandler := handler.NewAgentHandler(agentSvc)
 	toolHandler := handler.NewToolHandler(toolSvc)
@@ -191,6 +193,39 @@ func (s *Server) Start() error {
 		if r.Method == http.MethodGet {
 			modeHandler.List(w, r)
 		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Sessions
+	mux.HandleFunc("/api/sessions", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			sessionHandler.List(w, r)
+		case http.MethodPost:
+			sessionHandler.Create(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/sessions/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/messages") {
+			// /api/sessions/{id}/messages
+			if r.Method == http.MethodGet {
+				sessionHandler.ListMessages(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
+		switch r.Method {
+		case http.MethodPut:
+			sessionHandler.Update(w, r)
+		case http.MethodDelete:
+			sessionHandler.Delete(w, r)
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})

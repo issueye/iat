@@ -1,2 +1,4 @@
 iat_new/ui/frontend/dist/*
 iat_new/ui/frontend/node_modules/*
+*.exe
+*.db
