@@ -193,7 +193,6 @@ async function loadProjects() {
         projects.value = data || [];
         if (!currentProjectId.value && projects.value.length > 0) {
             currentProjectId.value = projects.value[0].id;
-            // TODO: loadSessions(currentProjectId.value);
         }
     } catch (e) {
         message.error("加载项目失败: " + e.message);
@@ -201,7 +200,22 @@ async function loadProjects() {
 }
 
 async function loadAgents() {
-    // TODO: Implement api.listAgents
+    try {
+        const data = await api.listAgents();
+        agents.value = data || [];
+    } catch (e) {
+        message.error("加载智能体失败: " + e.message);
+    }
+}
+
+async function loadSessions(projectId) {
+    if (!projectId) return;
+    try {
+        const data = await api.listSessions(projectId);
+        sessions.value = data || [];
+    } catch (e) {
+        message.error("加载会话失败: " + e.message);
+    }
 }
 
 // Chat Logic
@@ -297,7 +311,7 @@ function handleSSEEvent(data, aiMsgIndex) {
 // Lifecycle
 onMounted(() => {
     loadProjects();
-    // loadAgents();
+    loadAgents();
 });
 
 </script>

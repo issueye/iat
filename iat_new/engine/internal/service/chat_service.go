@@ -1101,6 +1101,25 @@ func (s *ChatService) Chat(sessionID uint, userMessage string, agentID uint, mod
 					default:
 						resultStr = fmt.Sprintf("Unknown action: %s", action)
 					}
+				case "review_output":
+					passed, _ := args["passed"].(bool)
+					comment, _ := args["comment"].(string)
+					taskIdVal, _ := args["taskId"].(float64)
+					taskId := uint(taskIdVal)
+
+					resultStr = fmt.Sprintf("Review recorded. Passed: %v, Comment: %s", passed, comment)
+
+					if taskId > 0 {
+						status := "failed"
+						if passed {
+							status = "completed"
+						}
+						if err := s.taskService.UpdateTask(taskId, status); err != nil {
+							resultStr += fmt.Sprintf(" (Failed to update task status: %v)", err)
+						} else {
+							resultStr += fmt.Sprintf(" (Task %d marked as %s)", taskId, status)
+						}
+					}
 				default:
 					// Check if it's a script tool
 					// Currently we don't have a way to know if a tool name belongs to a script tool directly from memory,

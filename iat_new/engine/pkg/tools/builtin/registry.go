@@ -37,7 +37,10 @@ func GetEinoTools(modeKey string) []*schema.ToolInfo {
 				t.Name != consts.ToolWriteFile.ToString() &&
 				t.Name != consts.ToolListFiles.ToString() &&
 				t.Name != consts.ToolReadFileRange.ToString() &&
-				t.Name != consts.ToolDiffFile.ToString() {
+				t.Name != consts.ToolDiffFile.ToString() &&
+				t.Name != "manage_tasks" &&
+				t.Name != "call_subagent" &&
+				t.Name != "review_output" {
 				continue
 			}
 		} else if modeKey == consts.BuildMode {
@@ -339,6 +342,30 @@ var BuiltinTools = []model.Tool{
 				}
 			},
 			"required": ["action"]
+		}`,
+	},
+	{
+		Name:        "review_output",
+		Description: "Review the output of a task or sub-agent execution",
+		Type:        consts.ToolTypeBuiltin,
+		Content:     "ReviewOutput",
+		Parameters: `{
+			"type": "object",
+			"properties": {
+				"taskId": {
+					"type": "number",
+					"description": "The ID of the task being reviewed (optional)"
+				},
+				"passed": {
+					"type": "boolean",
+					"description": "Whether the output passed the review"
+				},
+				"comment": {
+					"type": "string",
+					"description": "Review comments or feedback"
+				}
+			},
+			"required": ["passed", "comment"]
 		}`,
 	},
 }

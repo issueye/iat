@@ -11,6 +11,8 @@ export function CreateMCPServer(arg1:string,arg2:string,arg3:string,arg4:string,
 
 export function CreateProject(arg1:string,arg2:string,arg3:string):Promise<result.Result>;
 
+export function CreateSession(arg1:string,arg2:number,arg3:number):Promise<result.Result>;
+
 export function CreateTool(arg1:model.Tool):Promise<result.Result>;
 
 export function DeleteAIModel(arg1:number):Promise<result.Result>;
@@ -21,9 +23,13 @@ export function DeleteMCPServer(arg1:number):Promise<result.Result>;
 
 export function DeleteProject(arg1:number):Promise<result.Result>;
 
+export function DeleteSession(arg1:number):Promise<result.Result>;
+
 export function DeleteTool(arg1:number):Promise<result.Result>;
 
 export function GetScriptAPIDocs():Promise<result.Result>;
+
+export function GetSessionMessages(arg1:number):Promise<result.Result>;
 
 export function IndexAllProjects():Promise<result.Result>;
 
@@ -41,6 +47,8 @@ export function ListModes():Promise<result.Result>;
 
 export function ListProjects():Promise<result.Result>;
 
+export function ListSessions(arg1:number):Promise<result.Result>;
+
 export function ListTools():Promise<result.Result>;
 
 export function SelectDirectory():Promise<result.Result>;
@@ -52,5 +60,7 @@ export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5
 export function UpdateMCPServer(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:boolean):Promise<result.Result>;
 
 export function UpdateProject(arg1:number,arg2:string,arg3:string,arg4:string):Promise<result.Result>;
+
+export function UpdateSession(arg1:number,arg2:string):Promise<result.Result>;
 
 export function UpdateTool(arg1:model.Tool):Promise<result.Result>;

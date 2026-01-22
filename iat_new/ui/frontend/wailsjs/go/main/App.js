@@ -18,6 +18,10 @@ export function CreateProject(arg1, arg2, arg3) {
   return window['go']['main']['App']['CreateProject'](arg1, arg2, arg3);
 }
 
+export function CreateSession(arg1, arg2, arg3) {
+  return window['go']['main']['App']['CreateSession'](arg1, arg2, arg3);
+}
+
 export function CreateTool(arg1) {
   return window['go']['main']['App']['CreateTool'](arg1);
 }
@@ -38,12 +42,20 @@ export function DeleteProject(arg1) {
   return window['go']['main']['App']['DeleteProject'](arg1);
 }
 
+export function DeleteSession(arg1) {
+  return window['go']['main']['App']['DeleteSession'](arg1);
+}
+
 export function DeleteTool(arg1) {
   return window['go']['main']['App']['DeleteTool'](arg1);
 }
 
 export function GetScriptAPIDocs() {
   return window['go']['main']['App']['GetScriptAPIDocs']();
+}
+
+export function GetSessionMessages(arg1) {
+  return window['go']['main']['App']['GetSessionMessages'](arg1);
 }
 
 export function IndexAllProjects() {
@@ -78,6 +90,10 @@ export function ListProjects() {
   return window['go']['main']['App']['ListProjects']();
 }
 
+export function ListSessions(arg1) {
+  return window['go']['main']['App']['ListSessions'](arg1);
+}
+
 export function ListTools() {
   return window['go']['main']['App']['ListTools']();
 }
@@ -100,6 +116,10 @@ export function UpdateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, 
 
 export function UpdateProject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['UpdateProject'](arg1, arg2, arg3, arg4);
+}
+
+export function UpdateSession(arg1, arg2) {
+  return window['go']['main']['App']['UpdateSession'](arg1, arg2);
 }
 
 export function UpdateTool(arg1) {
