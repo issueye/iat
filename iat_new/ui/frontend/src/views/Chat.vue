@@ -22,7 +22,7 @@
           新建会话
         </n-button>
       </div>
-      
+
       <div class="session-search">
         <n-input
           v-model:value="sessionSearchQuery"
@@ -104,19 +104,22 @@
       <div class="messages-area">
         <div v-for="(msg, index) in messages" :key="index" class="message-item">
           <div class="message-role">
-            <n-tag size="small" :type="msg.role === 'user' ? 'primary' : 'success'">
+            <n-tag
+              size="small"
+              :type="msg.role === 'user' ? 'primary' : 'success'"
+            >
               {{ msg.role }}
             </n-tag>
-            <span class="message-time">{{ new Date(msg.createdAt).toLocaleTimeString() }}</span>
+            <span class="message-time">{{
+              new Date(msg.createdAt).toLocaleTimeString()
+            }}</span>
           </div>
           <div class="message-content">
             <pre class="content-pre">{{ msg.content }}</pre>
-            
+
             <!-- Tool Calls -->
             <div v-if="msg.role === 'tool'" class="tool-call">
-              <div class="tool-header">
-                Tool: {{ msg.toolName }}
-              </div>
+              <div class="tool-header">Tool: {{ msg.toolName }}</div>
               <pre class="tool-args">{{ msg.toolArguments }}</pre>
             </div>
           </div>
@@ -153,19 +156,29 @@
       title="新建会话"
       positive-text="创建"
       negative-text="取消"
-      @positive-click="async () => {
-        if(!newSessionName) return;
-        try {
-           await api.createSession(newSessionName, currentProjectId, currentChatAgentId || 0);
-           await loadSessions(currentProjectId);
-           showCreateModal = false;
-           newSessionName = '';
-        } catch(e) {
-           message.error(e.message);
+      @positive-click="
+        async () => {
+          if (!newSessionName) return;
+          try {
+            await api.createSession(
+              newSessionName,
+              currentProjectId,
+              currentChatAgentId || 0,
+            );
+            await loadSessions(currentProjectId);
+            showCreateModal = false;
+            newSessionName = '';
+          } catch (e) {
+            message.error(e.message);
+          }
         }
-      }"
+      "
     >
-      <n-input v-model:value="newSessionName" placeholder="会话名称" autofocus />
+      <n-input
+        v-model:value="newSessionName"
+        placeholder="会话名称"
+        autofocus
+      />
     </n-modal>
   </div>
 </template>
@@ -173,7 +186,16 @@
 <script setup>
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useMessage, useDialog, NIcon, NInput, NButton, NSelect, NTag, NModal } from "naive-ui";
+import {
+  useMessage,
+  useDialog,
+  NIcon,
+  NInput,
+  NButton,
+  NSelect,
+  NTag,
+  NModal,
+} from "naive-ui";
 import {
   TrashOutline,
   ArchiveOutline,
@@ -181,6 +203,7 @@ import {
   InformationCircleOutline,
   ChevronForwardOutline,
   ChevronDownOutline,
+  StopCircleOutline,
 } from "@vicons/ionicons5";
 import { api } from "../api";
 import {
@@ -213,7 +236,8 @@ const generationStatus = ref(ThinkingStatuses.End);
 // Computed properties
 const lastAssistantMessage = computed(() => {
   for (let i = messages.value.length - 1; i >= 0; i--) {
-    if (messages.value[i]?.role === ChatRoles.Assistant) return messages.value[i];
+    if (messages.value[i]?.role === ChatRoles.Assistant)
+      return messages.value[i];
   }
   return null;
 });
@@ -245,17 +269,17 @@ const searchedSessions = ref([]);
 const searchingSessions = ref(false);
 
 const projectOptions = computed(() => {
-    return projects.value.map(p => ({
-        label: p.name,
-        value: p.id
-    }));
+  return projects.value.map((p) => ({
+    label: p.name,
+    value: p.id,
+  }));
 });
 
 const agentOptions = computed(() => {
-    return agents.value.map(a => ({
-        label: a.name,
-        value: a.id
-    }));
+  return agents.value.map((a) => ({
+    label: a.name,
+    value: a.id,
+  }));
 });
 
 // Helper Functions
@@ -308,8 +332,10 @@ function parseThinkContent(text) {
 
 function getThinkingStatus(item) {
   if (item !== lastAssistantMessage.value) return ThinkingStatuses.End;
-  if (generationStatus.value === ThinkingStatuses.Cancel) return ThinkingStatuses.Cancel;
-  if (generationStatus.value === ThinkingStatuses.Error) return ThinkingStatuses.Error;
+  if (generationStatus.value === ThinkingStatuses.Cancel)
+    return ThinkingStatuses.Cancel;
+  if (generationStatus.value === ThinkingStatuses.Error)
+    return ThinkingStatuses.Error;
   const parsed = parseThinkContent(item?.content);
   if (isGenerating.value) {
     if (parsed.isThinkingOpen) {
@@ -332,191 +358,191 @@ const displaySessions = computed(() => {
 let eventSource = null;
 
 watch(currentProjectId, (newVal) => {
-    if (newVal) {
-        loadSessions(newVal);
-        currentSessionId.value = null;
-        messages.value = [];
-    }
+  if (newVal) {
+    loadSessions(newVal);
+    currentSessionId.value = null;
+    messages.value = [];
+  }
 });
 
 watch(currentSessionId, async (newVal) => {
-    if (newVal) {
-        try {
-            const msgs = await api.getSessionMessages(newVal);
-            // Convert backend message format to UI format
-            messages.value = (msgs || []).map(m => ({
-                role: m.role,
-                content: m.content,
-                createdAt: m.createdAt,
-                // Handle tool calls if needed
-            }));
-        } catch (e) {
-            message.error("加载消息失败: " + e.message);
-        }
-    } else {
-        messages.value = [];
+  if (newVal) {
+    try {
+      const msgs = await api.getSessionMessages(newVal);
+      // Convert backend message format to UI format
+      messages.value = (msgs || []).map((m) => ({
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+        // Handle tool calls if needed
+      }));
+    } catch (e) {
+      message.error("加载消息失败: " + e.message);
     }
+  } else {
+    messages.value = [];
+  }
 });
 
 // Methods
 async function handleClear() {
-    if (!currentSessionId.value) return;
-    dialog.warning({
-        title: "清空上下文",
-        content: "确定要清空当前会话的所有消息吗？这不会删除会话本身。",
-        positiveText: "确定",
-        negativeText: "取消",
-        onPositiveClick: async () => {
-            try {
-                await api.clearSessionMessages(currentSessionId.value);
-                messages.value = [];
-                message.success("上下文已清空");
-            } catch (e) {
-                message.error("清空失败: " + e.message);
-            }
-        }
-    });
+  if (!currentSessionId.value) return;
+  dialog.warning({
+    title: "清空上下文",
+    content: "确定要清空当前会话的所有消息吗？这不会删除会话本身。",
+    positiveText: "确定",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      try {
+        await api.clearSessionMessages(currentSessionId.value);
+        messages.value = [];
+        message.success("上下文已清空");
+      } catch (e) {
+        message.error("清空失败: " + e.message);
+      }
+    },
+  });
 }
 
 async function handleStop() {
-    if (!currentSessionId.value || !isGenerating.value) return;
-    try {
-        await api.abortSession(currentSessionId.value);
-        message.info("已请求停止生成");
-        isGenerating.value = false;
-        generationStatus.value = ThinkingStatuses.Cancel;
-    } catch (e) {
-        message.error("停止失败: " + e.message);
-    }
+  if (!currentSessionId.value || !isGenerating.value) return;
+  try {
+    await api.abortSession(currentSessionId.value);
+    message.info("已请求停止生成");
+    isGenerating.value = false;
+    generationStatus.value = ThinkingStatuses.Cancel;
+  } catch (e) {
+    message.error("停止失败: " + e.message);
+  }
 }
 
 async function loadProjects() {
-    try {
-        const data = await api.listProjects();
-        projects.value = data || [];
-        if (!currentProjectId.value && projects.value.length > 0) {
-            currentProjectId.value = projects.value[0].id;
-        }
-    } catch (e) {
-        message.error("加载项目失败: " + e.message);
+  try {
+    const data = await api.listProjects();
+    projects.value = data || [];
+    if (!currentProjectId.value && projects.value.length > 0) {
+      currentProjectId.value = projects.value[0].id;
     }
+  } catch (e) {
+    message.error("加载项目失败: " + e.message);
+  }
 }
 
 async function loadAgents() {
-    try {
-        const data = await api.listAgents();
-        agents.value = data || [];
-    } catch (e) {
-        message.error("加载智能体失败: " + e.message);
-    }
+  try {
+    const data = await api.listAgents();
+    agents.value = data || [];
+  } catch (e) {
+    message.error("加载智能体失败: " + e.message);
+  }
 }
 
 async function loadSessions(projectId) {
-    if (!projectId) return;
-    try {
-        const data = await api.listSessions(projectId);
-        sessions.value = data || [];
-    } catch (e) {
-        message.error("加载会话失败: " + e.message);
-    }
+  if (!projectId) return;
+  try {
+    const data = await api.listSessions(projectId);
+    sessions.value = data || [];
+  } catch (e) {
+    message.error("加载会话失败: " + e.message);
+  }
 }
 
 // Chat Logic
 async function handleSend(content) {
-    if (isGenerating.value) return;
-    if (!content.trim()) return;
+  if (isGenerating.value) return;
+  if (!content.trim()) return;
 
-    inputText.value = "";
-    isGenerating.value = true;
-    generationStatus.value = ThinkingStatuses.Start;
+  inputText.value = "";
+  isGenerating.value = true;
+  generationStatus.value = ThinkingStatuses.Start;
 
-    // Add User Message
+  // Add User Message
+  messages.value.push({
+    role: ChatRoles.User,
+    content: content,
+    createdAt: new Date().toISOString(),
+  });
+
+  // Add Assistant Placeholder
+  const aiMsgIndex =
     messages.value.push({
-        role: ChatRoles.User,
-        content: content,
-        createdAt: new Date().toISOString()
-    });
-
-    // Add Assistant Placeholder
-    const aiMsgIndex = messages.value.push({
-        role: ChatRoles.Assistant,
-        content: "",
-        createdAt: new Date().toISOString()
+      role: ChatRoles.Assistant,
+      content: "",
+      createdAt: new Date().toISOString(),
     }) - 1;
 
-    // Use Fetch for stream instead of EventSource for POST
-    try {
-        const response = await fetch(SSE.EventsUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                sessionId: currentSessionId.value || 0, // 0 for temporary session if not selected
-                message: content,
-                agentId: currentChatAgentId.value || 0,
-                mode: currentChatMode.value
-            })
-        });
+  // Use Fetch for stream instead of EventSource for POST
+  try {
+    const response = await fetch(SSE.EventsUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        sessionId: currentSessionId.value || 0, // 0 for temporary session if not selected
+        message: content,
+        agentId: currentChatAgentId.value || 0,
+        mode: currentChatMode.value,
+      }),
+    });
 
-        if (!response.ok) throw new Error(response.statusText);
+    if (!response.ok) throw new Error(response.statusText);
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataStr = line.slice(6);
-                    try {
-                        const data = JSON.parse(dataStr);
-                        handleSSEEvent(data, aiMsgIndex);
-                    } catch (e) {
-                        console.error('Error parsing SSE event', e);
-                    }
-                }
-            }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value);
+      const lines = chunk.split("\n\n");
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const dataStr = line.slice(6);
+          try {
+            const data = JSON.parse(dataStr);
+            handleSSEEvent(data, aiMsgIndex);
+          } catch (e) {
+            console.error("Error parsing SSE event", e);
+          }
         }
-    } catch (e) {
-        message.error("发送失败: " + e.message);
-        messages.value[aiMsgIndex].content = "[Error: " + e.message + "]";
-        generationStatus.value = ThinkingStatuses.Error;
-    } finally {
-        isGenerating.value = false;
-        generationStatus.value = ThinkingStatuses.End;
+      }
     }
+  } catch (e) {
+    message.error("发送失败: " + e.message);
+    messages.value[aiMsgIndex].content = "[Error: " + e.message + "]";
+    generationStatus.value = ThinkingStatuses.Error;
+  } finally {
+    isGenerating.value = false;
+    generationStatus.value = ThinkingStatuses.End;
+  }
 }
 
 function handleSSEEvent(data, aiMsgIndex) {
-    if (data.type === 'chunk') {
-        messages.value[aiMsgIndex].content += data.content;
-    } else if (data.type === 'tool_call') {
-        // Handle tool call UI
-        messages.value.push({
-            role: ChatRoles.Tool,
-            toolName: data.extra.name,
-            toolArguments: data.extra.arguments,
-            content: "",
-            collapsed: true
-        });
-    } else if (data.type === 'error') {
-        message.error(data.content);
-        generationStatus.value = ThinkingStatuses.Error;
-    }
+  if (data.type === "chunk") {
+    messages.value[aiMsgIndex].content += data.content;
+  } else if (data.type === "tool_call") {
+    // Handle tool call UI
+    messages.value.push({
+      role: ChatRoles.Tool,
+      toolName: data.extra.name,
+      toolArguments: data.extra.arguments,
+      content: "",
+      collapsed: true,
+    });
+  } else if (data.type === "error") {
+    message.error(data.content);
+    generationStatus.value = ThinkingStatuses.Error;
+  }
 }
 
 // Lifecycle
 onMounted(() => {
-    loadProjects();
-    loadAgents();
+  loadProjects();
+  loadAgents();
 });
-
 </script>
 
 <style scoped>
