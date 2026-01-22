@@ -17,7 +17,7 @@ func NewSSEHandler() *SSEHandler {
 		clients: make(map[chan string]bool),
 		New:     make(chan chan string),
 		Closed:  make(chan chan string),
-		Total:   make(chan string),
+		Total:   make(chan string, 100), // Buffer broadcast events
 	}
 
 	go handler.listen()
@@ -35,7 +35,12 @@ func (h *SSEHandler) listen() {
 			close(s)
 		case event := <-h.Total:
 			for client := range h.clients {
-				client <- event
+				select {
+				case client <- event:
+				default:
+					// Drop event if client is blocked to prevent blocking everyone
+					fmt.Println("SSE Client blocked, dropping event")
+				}
 			}
 		}
 	}
@@ -47,7 +52,7 @@ func (h *SSEHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
-	client := make(chan string)
+	client := make(chan string, 100) // Buffer events
 	h.New <- client
 
 	defer func() {

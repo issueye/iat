@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"iat/internal/model"
 	"iat/internal/pkg/common"
 	"iat/internal/pkg/script/modules"
@@ -54,11 +53,6 @@ func NewApp(sseHandler *sse.SSEHandler) *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-}
-
-// Greet returns a greeting for the given name
-func (a *App) Greet(name string) string {
-	return fmt.Sprintf("Hello %s, It's show time!", name)
 }
 
 // SelectDirectory opens a directory selection dialog
@@ -362,7 +356,7 @@ func (a *App) DeleteTool(id uint) *common.Result {
 // --- Chat Methods ---
 
 func (a *App) SendMessage(sessionID uint, userMessage string, agentID uint, mode string) *common.Result {
-	eventChan := make(chan service.ChatEvent)
+	eventChan := make(chan service.ChatEvent, 100) // Buffer to decouple service from SSE
 
 	go func() {
 		for evt := range eventChan {
