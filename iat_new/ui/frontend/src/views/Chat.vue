@@ -689,8 +689,13 @@ onMounted(() => {
 }
 
 .input-area {
+  width: 100%;
   display: flex;
   gap: 10px;
+}
+
+:deep(.el-sender-wrap) {
+  width: calc(100% - 100px);
 }
 
 .send-btn {
