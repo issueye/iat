@@ -128,12 +128,32 @@
               <pre class="tool-args">{{ item.toolArguments }}</pre>
             </div>
             <div v-else>
+              <Thinking
+                v-if="
+                  parseThinkContent(item.content).think ||
+                  parseThinkContent(item.content).isThinkingOpen
+                "
+                :content="parseThinkContent(item.content).think"
+              />
               <XMarkdown
-                :markdown="item.content"
+                v-if="parseThinkContent(item.content).answer"
+                :markdown="parseThinkContent(item.content).answer"
                 default-theme-mode="light"
                 style="text-align: left; margin-top: 8px"
                 :code-x-props="{ enableCodeLineNumber: true }"
               />
+              <!-- Sub-Agent Tasks -->
+              <div
+                v-if="getTasksByMessage(item).length > 0"
+                class="sub-agent-tasks-container"
+              >
+                <SubAgentCard
+                  v-for="task in getTasksByMessage(item)"
+                  :key="task.taskId"
+                  v-bind="task"
+                  @abort="handleAbortSubAgent"
+                />
+              </div>
             </div>
           </template>
           <template #footer="{ item }">
@@ -253,6 +273,7 @@ import {
   StopCircleOutline,
 } from "@vicons/ionicons5";
 import { api } from "../api";
+import SubAgentCard from "../components/SubAgentCard.vue";
 import {
   ChatModes,
   ChatRoles,
@@ -279,6 +300,26 @@ const messages = ref([]);
 const inputText = ref("");
 const isGenerating = ref(false);
 const generationStatus = ref(ThinkingStatuses.End);
+
+// Sub-Agent Tasks State
+const subAgentTaskMap = ref(new Map());
+
+function getTasksByMessage(msg) {
+  const idx = messages.value.indexOf(msg);
+  if (idx === -1) return [];
+  return Array.from(subAgentTaskMap.value.values()).filter(
+    (t) => t.messageIndex === idx && !t.parentTaskId,
+  );
+}
+
+async function handleAbortSubAgent(taskId) {
+  try {
+    await api.abortSubAgentTask(taskId);
+    message.success("子任务中止请求已发送");
+  } catch (e) {
+    message.error("中止失败: " + e.message);
+  }
+}
 
 // Computed properties
 const lastAssistantMessage = computed(() => {
@@ -436,6 +477,12 @@ watch(currentProjectId, (newVal) => {
 
 watch(currentSessionId, async (newVal) => {
   if (newVal) {
+    // Sync agent from session
+    const sess = sessions.value.find((s) => s.id === newVal);
+    if (sess && sess.agentId) {
+      currentChatAgentId.value = sess.agentId;
+    }
+
     try {
       const msgs = await api.getSessionMessages(newVal);
       // Convert backend message format to UI format
@@ -528,6 +575,11 @@ async function handleSend(val) {
   if (isGenerating.value) return;
   if (!content || !content.trim()) return;
 
+  if (!currentChatAgentId.value) {
+    message.error("请先选择一个智能体");
+    return;
+  }
+
   inputText.value = "";
   isGenerating.value = true;
   generationStatus.value = ThinkingStatuses.Start;
@@ -601,14 +653,71 @@ function handleSSEEvent(data, aiMsgIndex) {
   if (data.type === "chunk") {
     messages.value[aiMsgIndex].content += data.content;
   } else if (data.type === "tool_call") {
-    // Handle tool call UI
-    messages.value.push({
-      role: ChatRoles.Tool,
-      toolName: data.extra.name,
-      toolArguments: data.extra.arguments,
-      content: "",
-      collapsed: true,
-    });
+    const {
+      stage,
+      taskId,
+      content,
+      agentName,
+      query,
+      status,
+      error,
+      result,
+      depth,
+      parentTaskId,
+    } = data.extra || {};
+
+    if (
+      stage === "subagent_start" ||
+      data.extra?.eventType === "subagent_start"
+    ) {
+      const task = {
+        taskId,
+        agentName,
+        query,
+        status: status || "pending",
+        depth: depth || 0,
+        parentTaskId,
+        chunks: [],
+        children: [],
+        messageIndex: aiMsgIndex, // Link to the message that triggered this task
+      };
+      subAgentTaskMap.value.set(taskId, task);
+
+      if (parentTaskId) {
+        const parentTask = subAgentTaskMap.value.get(parentTaskId);
+        if (parentTask) {
+          parentTask.children.push(task);
+        }
+      }
+    } else if (
+      stage === "subagent_chunk" ||
+      data.extra?.eventType === "subagent_chunk"
+    ) {
+      const task = subAgentTaskMap.value.get(taskId);
+      if (task) {
+        task.chunks.push(content);
+        task.status = "running";
+      }
+    } else if (
+      stage === "subagent_done" ||
+      data.extra?.eventType === "subagent_done"
+    ) {
+      const task = subAgentTaskMap.value.get(taskId);
+      if (task) {
+        task.status = status;
+        task.result = result;
+        task.error = error;
+      }
+    } else {
+      // Standard tool call
+      messages.value.push({
+        role: ChatRoles.Tool,
+        toolName: data.extra.name,
+        toolArguments: data.extra.arguments,
+        content: "",
+        collapsed: true,
+      });
+    }
   } else if (data.type === "error") {
     message.error(data.content);
     generationStatus.value = ThinkingStatuses.Error;

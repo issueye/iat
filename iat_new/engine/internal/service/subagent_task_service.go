@@ -33,7 +33,7 @@ func NewSubAgentTaskService(sseHandler *sse.SSEHandler) *SubAgentTaskService {
 }
 
 // CreateTask 创建子任务记录
-func (s *SubAgentTaskService) CreateTask(sessionID uint, agentName, query, parentTaskID string, depth int) (*model.SubAgentTask, error) {
+func (s *SubAgentTaskService) CreateTask(sessionID uint, agentName, query, parentTaskID string, depth int, eventChan chan<- chat.ChatEvent) (*model.SubAgentTask, error) {
 	if depth > SubAgentMaxDepth {
 		return nil, fmt.Errorf("sub-agent recursion depth exceeded (max: %d)", SubAgentMaxDepth)
 	}
@@ -50,17 +50,37 @@ func (s *SubAgentTaskService) CreateTask(sessionID uint, agentName, query, paren
 	if err := s.repo.Create(task); err != nil {
 		return nil, err
 	}
-	s.notifySubAgentEvent(sessionID, "subagent_start", map[string]interface{}{
+
+	eventData := map[string]interface{}{
 		"taskId":       task.TaskID,
 		"agentName":    agentName,
+		"query":        query,
 		"parentTaskId": parentTaskID,
 		"depth":        depth,
-	})
+		"status":       task.Status,
+	}
+
+	if eventChan != nil {
+		eventChan <- chat.ChatEvent{
+			Type: chat.ChatEventToolCall,
+			Extra: map[string]interface{}{
+				"stage":        "subagent_start",
+				"taskId":       task.TaskID,
+				"agentName":    agentName,
+				"query":        query,
+				"parentTaskId": parentTaskID,
+				"depth":        depth,
+				"status":       task.Status,
+			},
+		}
+	}
+
+	s.notifySubAgentEvent(sessionID, "subagent_start", eventData)
 	return task, nil
 }
 
 // UpdateStatus 更新任务状态
-func (s *SubAgentTaskService) UpdateStatus(taskID string, status model.SubAgentTaskStatus, result, errMsg string) error {
+func (s *SubAgentTaskService) UpdateStatus(taskID string, status model.SubAgentTaskStatus, result, errMsg string, eventChan chan<- chat.ChatEvent) error {
 	task, err := s.repo.GetByTaskID(taskID)
 	if err != nil {
 		return err
@@ -72,12 +92,28 @@ func (s *SubAgentTaskService) UpdateStatus(taskID string, status model.SubAgentT
 	if status == model.SubAgentTaskCompleted || status == model.SubAgentTaskFailed || status == model.SubAgentTaskAborted {
 		eventType = "subagent_done"
 	}
-	s.notifySubAgentEvent(task.SessionID, eventType, map[string]interface{}{
+
+	eventData := map[string]interface{}{
 		"taskId": taskID,
 		"status": status,
 		"result": result,
 		"error":  errMsg,
-	})
+	}
+
+	if eventChan != nil {
+		eventChan <- chat.ChatEvent{
+			Type: chat.ChatEventToolCall,
+			Extra: map[string]interface{}{
+				"stage":  eventType,
+				"taskId": taskID,
+				"status": status,
+				"result": result,
+				"error":  errMsg,
+			},
+		}
+	}
+
+	s.notifySubAgentEvent(task.SessionID, eventType, eventData)
 	return nil
 }
 
@@ -106,7 +142,7 @@ func (s *SubAgentTaskService) UnregisterCancel(taskID string) {
 }
 
 // AbortTask 中止任务
-func (s *SubAgentTaskService) AbortTask(taskID string) error {
+func (s *SubAgentTaskService) AbortTask(taskID string, eventChan chan<- chat.ChatEvent) error {
 	s.mu.Lock()
 	cancel, ok := s.cancels[taskID]
 	if ok {
@@ -117,17 +153,17 @@ func (s *SubAgentTaskService) AbortTask(taskID string) error {
 	if ok && cancel != nil {
 		cancel()
 	}
-	return s.UpdateStatus(taskID, model.SubAgentTaskAborted, "", "aborted by user")
+	return s.UpdateStatus(taskID, model.SubAgentTaskAborted, "", "aborted by user", eventChan)
 }
 
 // AbortAllBySessionID 中止会话下所有运行中的子任务
-func (s *SubAgentTaskService) AbortAllBySessionID(sessionID uint) error {
+func (s *SubAgentTaskService) AbortAllBySessionID(sessionID uint, eventChan chan<- chat.ChatEvent) error {
 	tasks, err := s.repo.ListRunningBySessionID(sessionID)
 	if err != nil {
 		return err
 	}
 	for _, t := range tasks {
-		_ = s.AbortTask(t.TaskID)
+		_ = s.AbortTask(t.TaskID, eventChan)
 	}
 	return nil
 }

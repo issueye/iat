@@ -1,31 +1,31 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = "http://localhost:8080/api";
 
 const client = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
 export const api = {
   checkHealth: async () => {
-    const resp = await client.get('/health');
+    const resp = await client.get("/health");
     return resp.data;
   },
   listProjects: async () => {
-      const resp = await client.get('/projects');
-      return resp.data;
+    const resp = await client.get("/projects");
+    return resp.data;
   },
   createProject: async (name: string, description: string, path: string) => {
-      const resp = await client.post('/projects', { name, description, path });
-      return resp.data;
+    const resp = await client.post("/projects", { name, description, path });
+    return resp.data;
   },
-  
+
   // Agent Methods
   listAgents: async () => {
-    const resp = await client.get('/agents');
+    const resp = await client.get("/agents");
     return resp.data;
   },
 
@@ -35,7 +35,7 @@ export const api = {
     return resp.data;
   },
   createSession: async (name: string, projectId: number, agentId: number) => {
-    const resp = await client.post('/sessions', { name, projectId, agentId });
+    const resp = await client.post("/sessions", { name, projectId, agentId });
     return resp.data;
   },
   updateSession: async (id: number, name: string) => {
@@ -51,12 +51,22 @@ export const api = {
     return resp.data;
   },
   clearSessionMessages: async (id: number) => {
-      const resp = await client.delete(`/sessions/${id}/messages`);
-      return resp.data;
+    const resp = await client.delete(`/sessions/${id}/messages`);
+    return resp.data;
   },
   abortSession: async (id: number) => {
-      const resp = await client.post(`/sessions/${id}/abort`);
-      return resp.data;
+    const resp = await client.post(`/sessions/${id}/abort`);
+    return resp.data;
+  },
+
+  // Sub-Agent Task Methods
+  abortSubAgentTask: async (taskId: string) => {
+    const resp = await client.post(`/subagent-tasks/${taskId}/abort`);
+    return resp.data;
+  },
+  getSubAgentTasksBySession: async (sessionId: number) => {
+    const resp = await client.get(`/subagent-tasks?sessionId=${sessionId}`);
+    return resp.data;
   },
 
   // Note: Chat stream is handled via EventSource or fetch stream manually

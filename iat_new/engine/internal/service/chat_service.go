@@ -111,7 +111,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	var subTask *model.SubAgentTask
 	if s.subAgentTaskService != nil {
 		var err error
-		subTask, err = s.subAgentTaskService.CreateTask(sessionID, agentName, query, parentTaskID, depth)
+		subTask, err = s.subAgentTaskService.CreateTask(sessionID, agentName, query, parentTaskID, depth, eventChan)
 		if err != nil {
 			return "", fmt.Errorf("failed to create sub-agent task: %v", err)
 		}
@@ -195,7 +195,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 		resp, err := aiClient.Chat(ctx, messages)
 		if err != nil {
 			if s.subAgentTaskService != nil && subTask != nil {
-				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", err.Error())
+				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", err.Error(), eventChan)
 			}
 			return "", err
 		}
@@ -215,7 +215,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 			// Done - update task status
 			result := stripThinkContent(resp.Content)
 			if s.subAgentTaskService != nil && subTask != nil {
-				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskCompleted, result, "")
+				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskCompleted, result, "", eventChan)
 			}
 			return result, nil
 		}
@@ -438,7 +438,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	}
 
 	if s.subAgentTaskService != nil && subTask != nil {
-		s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", "max turns exceeded")
+		s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", "max turns exceeded", eventChan)
 	}
 	return "", fmt.Errorf("max turns exceeded")
 }
@@ -1274,7 +1274,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 				}, eventChan)
 
 				// Run Internal Agent
-				res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key, eventChan)
+				res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key, 0, "", eventChan)
 				if err != nil {
 					resultStr = fmt.Sprintf("Error calling sub-agent '%s': %v", agentName, err)
 				} else {

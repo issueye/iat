@@ -40,10 +40,35 @@ func (s *Server) Start() error {
 	toolHandler := handler.NewToolHandler(toolSvc)
 	mcpHandler := handler.NewMCPHandler(mcpSvc)
 	modeHandler := handler.NewModeHandler(modeSvc)
+	subAgentTaskHandler := handler.NewSubAgentTaskHandler(subAgentTaskSvc)
 	runtimeTestHandler := handler.NewRuntimeTestHandler()
 
 	// CORS middleware
 	handler := corsMiddleware(mux)
+	// Sub-Agent Tasks
+	mux.HandleFunc("/api/subagent-tasks", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			subAgentTaskHandler.List(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/subagent-tasks/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/abort") {
+			if r.Method == http.MethodPost {
+				subAgentTaskHandler.Abort(w, r)
+			} else {
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+		if r.Method == http.MethodGet {
+			subAgentTaskHandler.Get(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))

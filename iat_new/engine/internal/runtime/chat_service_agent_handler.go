@@ -32,6 +32,8 @@ func (h *ChatServiceAgentHandler) Handle(ctx context.Context, r *Runtime, inst *
 		content,
 		".",
 		modeKey,
+		0,
+		"",
 		nil,
 	)
 	if err != nil {
@@ -69,4 +71,3 @@ func getPayloadContent(payload any) (string, error) {
 	}
 	return "", fmt.Errorf("invalid payload content")
 }
-
