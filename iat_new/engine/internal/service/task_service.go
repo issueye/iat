@@ -3,7 +3,7 @@ package service
 import (
 	"encoding/json"
 	"iat/common/model"
-	"iat/engine/pkg/sse"
+	"iat/common/pkg/sse"
 	"iat/engine/internal/repo"
 )
 

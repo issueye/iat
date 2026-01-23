@@ -35,7 +35,14 @@
         <n-form-item label="描述" path="description">
           <n-input v-model:value="formValue.description" placeholder="描述" />
         </n-form-item>
-        <n-form-item label="模型" path="modelId">
+        <n-form-item label="类型" path="type">
+          <n-select
+            v-model:value="formValue.type"
+            :options="typeOptions"
+            placeholder="选择类型"
+          />
+        </n-form-item>
+        <n-form-item v-if="formValue.type !== 'external'" label="模型" path="modelId">
           <n-select
             v-model:value="formValue.modelId"
             :options="modelOptions"
@@ -43,7 +50,7 @@
             clearable
           />
         </n-form-item>
-        <n-form-item label="关联工具" path="toolIds">
+        <n-form-item v-if="formValue.type !== 'external'" label="关联工具" path="toolIds">
           <n-select
             v-model:value="formValue.toolIds"
             multiple
@@ -51,7 +58,7 @@
             placeholder="选择工具"
           />
         </n-form-item>
-        <n-form-item label="关联 MCP 服务" path="mcpServerIds">
+        <n-form-item v-if="formValue.type !== 'external'" label="关联 MCP 服务" path="mcpServerIds">
           <n-select
             v-model:value="formValue.mcpServerIds"
             multiple
@@ -59,12 +66,30 @@
             placeholder="选择 MCP 服务"
           />
         </n-form-item>
-        <n-form-item label="系统提示词" path="systemPrompt">
+        <n-form-item v-if="formValue.type !== 'external'" label="系统提示词" path="systemPrompt">
           <n-input
             v-model:value="formValue.systemPrompt"
             type="textarea"
             :autosize="{ minRows: 5, maxRows: 10 }"
             placeholder="你是一个有用的助手..."
+          />
+        </n-form-item>
+        <n-form-item v-if="formValue.type === 'external'" label="外部地址" path="externalUrl">
+          <n-input v-model:value="formValue.externalUrl" placeholder="例如 http://localhost:18080/a2a 或 /a2a/stream" />
+        </n-form-item>
+        <n-form-item v-if="formValue.type === 'external'" label="外部类型" path="externalType">
+          <n-select
+            v-model:value="formValue.externalType"
+            :options="externalTypeOptions"
+            placeholder="选择外部 Agent 类型"
+          />
+        </n-form-item>
+        <n-form-item v-if="formValue.type === 'external'" label="调用参数(JSON)" path="externalParams">
+          <n-input
+            v-model:value="formValue.externalParams"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 8 }"
+            placeholder='例如: {"headers":{"X-Env":"dev"},"query":{"projectId":"${projectId}"}}'
           />
         </n-form-item>
       </n-form>
@@ -110,17 +135,31 @@ const formValue = ref({
   name: "",
   description: "",
   systemPrompt: "",
+  type: "custom",
   modelId: null,
   toolIds: [],
   mcpServerIds: [],
+  externalUrl: "",
+  externalType: "",
+  externalParams: "",
 });
 
 const rules = {
   name: { required: true, message: "必填", trigger: "blur" },
-  modelId: { required: true, message: "必填", type: "number", trigger: "blur" },
+  type: { required: true, message: "必填", trigger: "blur" },
 };
 
 const pagination = { pageSize: 10 };
+
+const typeOptions = [
+  { label: "普通 Agent", value: "custom" },
+  { label: "外部 Agent", value: "external" },
+];
+
+const externalTypeOptions = [
+  { label: "http_a2a", value: "http_a2a" },
+  { label: "http_sse", value: "http_sse" },
+];
 
 const columns = [
   { title: "名称", key: "name", width: 150 },
@@ -270,9 +309,13 @@ function handleEdit(row) {
     name: row.name,
     description: row.description,
     systemPrompt: row.systemPrompt,
+    type: row.type || "custom",
     modelId: row.modelId,
     toolIds: (row.tools || []).map((t) => t.id),
     mcpServerIds: (row.mcpServers || []).map((m) => m.id),
+    externalUrl: row.externalUrl || "",
+    externalType: row.externalType || "",
+    externalParams: row.externalParams || "",
   };
   showCreateModal.value = true;
 }
@@ -305,9 +348,13 @@ function closeModal() {
     name: "",
     description: "",
     systemPrompt: "",
+    type: "custom",
     modelId: null,
     toolIds: [],
     mcpServerIds: [],
+    externalUrl: "",
+    externalType: "",
+    externalParams: "",
   };
   isEdit.value = false;
   editingId.value = null;
@@ -322,8 +369,8 @@ async function handleSubmit() {
   submitting.value = true;
   try {
     let res;
-    // Handle modelId being null/undefined/0
     const modelId = formValue.value.modelId || 0;
+    const type = formValue.value.type || "custom";
 
     if (isEdit.value) {
       res = await UpdateAgent(
@@ -331,6 +378,10 @@ async function handleSubmit() {
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
+        type,
+        formValue.value.externalUrl,
+        formValue.value.externalType,
+        formValue.value.externalParams,
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
@@ -341,6 +392,10 @@ async function handleSubmit() {
         formValue.value.name,
         formValue.value.description,
         formValue.value.systemPrompt,
+        type,
+        formValue.value.externalUrl,
+        formValue.value.externalType,
+        formValue.value.externalParams,
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,

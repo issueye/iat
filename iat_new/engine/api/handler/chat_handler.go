@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"iat/common/pkg/chat"
 	"iat/engine/internal/service"
 	"net/http"
 	"strconv"
@@ -60,14 +61,14 @@ func (h *ChatHandler) Stream(w http.ResponseWriter, r *http.Request) {
 		req.Mode = r.URL.Query().Get("mode")
 	}
 
-	eventChan := make(chan service.ChatEvent)
+	eventChan := make(chan chat.ChatEvent)
 	
 	// Start Chat in background
 	go func() {
 		defer close(eventChan)
 		// Pass r.Context() to ensure cancellation if client disconnects
-		if err := h.svc.Chat(r.Context(), req.SessionID, req.Message, req.AgentID, req.Mode, eventChan); err != nil {
-			eventChan <- service.ChatEvent{Type: service.ChatEventError, Content: err.Error()}
+			if err := h.svc.Chat(r.Context(), req.SessionID, req.Message, req.AgentID, req.Mode, eventChan); err != nil {
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventError, Content: err.Error()}
 		}
 	}()
 

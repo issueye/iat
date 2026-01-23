@@ -3,5 +3,6 @@ go 1.24.11
 use (
 	./common
 	./engine
+	./golang_agent
 	./ui
 )

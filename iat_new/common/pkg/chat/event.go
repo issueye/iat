@@ -1,4 +1,4 @@
-package service
+package chat
 
 type ChatEventType string
 
@@ -10,8 +10,8 @@ const (
 	ChatEventDone       ChatEventType = "done"
 	ChatEventUsage      ChatEventType = "usage"
 	ChatEventTerminated ChatEventType = "terminated"
-    ChatEventSubAgentStart ChatEventType = "subagent_start"
-    ChatEventSubAgentChunk ChatEventType = "subagent_chunk"
+	ChatEventSubAgentStart ChatEventType = "subagent_start"
+	ChatEventSubAgentChunk ChatEventType = "subagent_chunk"
 )
 
 type ChatEvent struct {
@@ -19,3 +19,4 @@ type ChatEvent struct {
 	Content string                 `json:"content"`
 	Extra   map[string]interface{} `json:"extra,omitempty"`
 }
+

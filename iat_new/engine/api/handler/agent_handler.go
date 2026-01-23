@@ -30,16 +30,20 @@ func (h *AgentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Name         string `json:"name"`
 		Description  string `json:"description"`
 		SystemPrompt string `json:"systemPrompt"`
+		Type         string `json:"type"`
 		ModelID      uint   `json:"modelId"`
 		ToolIDs      []uint `json:"toolIds"`
 		MCPServerIDs []uint `json:"mcpServerIds"`
 		ModeID       uint   `json:"modeId"`
+		ExternalURL  string `json:"externalUrl"`
+		ExternalType string `json:"externalType"`
+		ExternalParams string `json:"externalParams"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.svc.CreateAgent(req.Name, req.Description, req.SystemPrompt, req.ModelID, req.ToolIDs, req.MCPServerIDs, req.ModeID); err != nil {
+	if err := h.svc.CreateAgent(req.Name, req.Description, req.SystemPrompt, req.Type, req.ExternalURL, req.ExternalType, req.ExternalParams, req.ModelID, req.ToolIDs, req.MCPServerIDs, req.ModeID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -63,16 +67,20 @@ func (h *AgentHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Name         string `json:"name"`
 		Description  string `json:"description"`
 		SystemPrompt string `json:"systemPrompt"`
+		Type         string `json:"type"`
 		ModelID      uint   `json:"modelId"`
 		ToolIDs      []uint `json:"toolIds"`
 		MCPServerIDs []uint `json:"mcpServerIds"`
 		ModeID       uint   `json:"modeId"`
+		ExternalURL  string `json:"externalUrl"`
+		ExternalType string `json:"externalType"`
+		ExternalParams string `json:"externalParams"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := h.svc.UpdateAgent(uint(id), req.Name, req.Description, req.SystemPrompt, req.ModelID, req.ToolIDs, req.MCPServerIDs, req.ModeID); err != nil {
+	if err := h.svc.UpdateAgent(uint(id), req.Name, req.Description, req.SystemPrompt, req.Type, req.ExternalURL, req.ExternalType, req.ExternalParams, req.ModelID, req.ToolIDs, req.MCPServerIDs, req.ModeID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

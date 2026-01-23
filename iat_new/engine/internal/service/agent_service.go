@@ -16,7 +16,7 @@ func NewAgentService() *AgentService {
 	}
 }
 
-func (s *AgentService) CreateAgent(name, description, systemPrompt string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
+func (s *AgentService) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
 	var tools []model.Tool
 	for _, tid := range toolIDs {
 		tools = append(tools, model.Tool{Base: model.Base{ID: tid}})
@@ -27,19 +27,27 @@ func (s *AgentService) CreateAgent(name, description, systemPrompt string, model
 		mcpServers = append(mcpServers, model.MCPServer{Base: model.Base{ID: mid}})
 	}
 
+	if agentType == "" {
+		agentType = "custom"
+	}
+
 	agent := &model.Agent{
 		Name:         name,
 		Description:  description,
 		SystemPrompt: systemPrompt,
+		Type:         agentType,
 		ModelID:      modelID,
 		Tools:        tools,
 		MCPServers:   mcpServers,
 		ModeID:       modeID,
+		ExternalURL:  externalURL,
+		ExternalType: externalType,
+		ExternalParams: externalParams,
 	}
 	return s.repo.Create(agent)
 }
 
-func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
+func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
 	agent, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
@@ -55,6 +63,10 @@ func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt stri
 		mcpServers = append(mcpServers, model.MCPServer{Base: model.Base{ID: mid}})
 	}
 
+	if agentType != "" {
+		agent.Type = agentType
+	}
+
 	agent.Name = name
 	agent.Description = description
 	agent.SystemPrompt = systemPrompt
@@ -62,6 +74,9 @@ func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt stri
 	agent.Tools = tools
 	agent.MCPServers = mcpServers
 	agent.ModeID = modeID
+	agent.ExternalURL = externalURL
+	agent.ExternalType = externalType
+	agent.ExternalParams = externalParams
 	
 	return s.repo.Update(agent)
 }

@@ -1,15 +1,20 @@
 package service
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"iat/common/model"
+	"iat/common/pkg/chat"
 	"iat/common/pkg/consts"
 	"iat/engine/internal/repo"
 	"iat/engine/pkg/ai"
 	"iat/engine/pkg/tools/builtin"
 	"iat/engine/pkg/tools/script"
+	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -71,10 +76,9 @@ func NewChatService(mcpService *MCPService, taskService *TaskService) *ChatServi
 	}
 }
 
-func (s *ChatService) sendToolEvent(sessionID uint, payload map[string]interface{}, eventChan chan<- ChatEvent) {
-	// Construct generic event
-	eventChan <- ChatEvent{
-		Type:  ChatEventToolCall, // Generic tool event type
+func (s *ChatService) sendToolEvent(sessionID uint, payload map[string]interface{}, eventChan chan<- chat.ChatEvent) {
+	eventChan <- chat.ChatEvent{
+		Type:  chat.ChatEventToolCall,
 		Extra: payload,
 	}
 }
@@ -94,7 +98,7 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 }
 
 // RunAgentInternal runs an agent synchronously for internal calls (like sub-agents)
-func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, eventChan chan<- ChatEvent) (string, error) {
+func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, eventChan chan<- chat.ChatEvent) (string, error) {
 	// 1. Find Agent
 	agents, err := s.agentRepo.List() // TODO: Optimize by Name lookup
 	if err != nil {
@@ -379,6 +383,183 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	return "", fmt.Errorf("max turns exceeded")
 }
 
+func (s *ChatService) chatWithExternalAgent(ctx context.Context, session *model.Session, agent *model.Agent, userMessage string, modeKey string, project *model.Project, eventChan chan<- chat.ChatEvent) error {
+	userMsg := &model.Message{
+		SessionID: session.ID,
+		Role:      consts.RoleUser,
+		Content:   userMessage,
+	}
+	if err := s.messageRepo.Create(userMsg); err != nil {
+		return fmt.Errorf("failed to save user message: %v", err)
+	}
+
+	params := map[string]interface{}{}
+	if agent.ExternalParams != "" {
+		_ = json.Unmarshal([]byte(agent.ExternalParams), &params)
+	}
+	applyExternalPlaceholders(params, session, agent, modeKey, project)
+
+	body := map[string]interface{}{
+		"content": userMessage,
+		"system":  agent.SystemPrompt,
+		"params":  params,
+	}
+
+	client := &http.Client{
+		Timeout: 0,
+	}
+
+	if agent.ExternalType == "" || agent.ExternalType == "http_sse" {
+		b, _ := json.Marshal(body)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, agent.ExternalURL, bytes.NewReader(b))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			data, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("external agent error: %s", string(data))
+		}
+
+		reader := bufio.NewScanner(resp.Body)
+		reader.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+		var full strings.Builder
+
+		for reader.Scan() {
+			line := reader.Text()
+			if strings.HasPrefix(line, "data: ") {
+				payload := strings.TrimSpace(strings.TrimPrefix(line, "data: "))
+				if payload == "" {
+					continue
+				}
+				var obj struct {
+					Type string `json:"type"`
+					Text string `json:"text"`
+				}
+				if err := json.Unmarshal([]byte(payload), &obj); err != nil {
+					continue
+				}
+				if obj.Text != "" {
+					full.WriteString(obj.Text)
+					if eventChan != nil {
+						eventChan <- chat.ChatEvent{Type: chat.ChatEventChunk, Content: obj.Text}
+					}
+				}
+			}
+		}
+
+		if err := reader.Err(); err != nil {
+			return err
+		}
+
+		reply := full.String()
+		if reply != "" {
+			assistantMsg := &model.Message{
+				SessionID: session.ID,
+				Role:      consts.RoleAssistant,
+				Content:   reply,
+			}
+			if err := s.messageRepo.Create(assistantMsg); err != nil {
+				return err
+			}
+		}
+
+		if eventChan != nil {
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventDone}
+		}
+		return nil
+	}
+
+	if agent.ExternalType == "http_a2a" {
+		b, _ := json.Marshal(body)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, agent.ExternalURL, bytes.NewReader(b))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode >= 400 {
+			data, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("external agent error: %s", string(data))
+		}
+
+		var out struct {
+			Result string `json:"result"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&out)
+		if out.Result == "" {
+			return nil
+		}
+
+		assistantMsg := &model.Message{
+			SessionID: session.ID,
+			Role:      consts.RoleAssistant,
+			Content:   out.Result,
+		}
+		if err := s.messageRepo.Create(assistantMsg); err != nil {
+			return err
+		}
+		if eventChan != nil {
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventChunk, Content: out.Result}
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventDone}
+		}
+		return nil
+	}
+
+	return fmt.Errorf("unsupported external agent type: %s", agent.ExternalType)
+}
+
+func applyExternalPlaceholders(params map[string]interface{}, session *model.Session, agent *model.Agent, modeKey string, project *model.Project) {
+	if params == nil {
+		return
+	}
+	replace := func(s string) string {
+		out := s
+		out = strings.ReplaceAll(out, "${sessionId}", fmt.Sprint(session.ID))
+		out = strings.ReplaceAll(out, "${agentId}", fmt.Sprint(agent.ID))
+		if modeKey != "" {
+			out = strings.ReplaceAll(out, "${mode}", modeKey)
+		} else {
+			out = strings.ReplaceAll(out, "${mode}", agent.Mode.Key)
+		}
+		if project != nil {
+			out = strings.ReplaceAll(out, "${projectId}", fmt.Sprint(project.ID))
+			out = strings.ReplaceAll(out, "${projectPath}", project.Path)
+		}
+		return out
+	}
+	for k, v := range params {
+		switch vv := v.(type) {
+		case string:
+			params[k] = replace(vv)
+		case map[string]interface{}:
+			applyExternalPlaceholders(vv, session, agent, modeKey, project)
+		case []interface{}:
+			for i, elem := range vv {
+				if s, ok := elem.(string); ok {
+					vv[i] = replace(s)
+				} else if m, ok := elem.(map[string]interface{}); ok {
+					applyExternalPlaceholders(m, session, agent, modeKey, project)
+				}
+			}
+		}
+	}
+}
+
 func (s *ChatService) ListToolInvocations(sessionID uint) ([]model.ToolInvocation, error) {
 	return s.toolRepo.ListBySessionID(sessionID)
 }
@@ -483,7 +664,7 @@ func (s *ChatService) AbortSession(sessionID uint) {
 }
 
 // Chat handles the main chat logic
-func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage string, agentID uint, modeKey string, eventChan chan<- ChatEvent) error {
+func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage string, agentID uint, modeKey string, eventChan chan<- chat.ChatEvent) error {
 	// 1. Get Session
 	session, err := s.sessionRepo.GetByID(sessionID)
 	if err != nil {
@@ -514,6 +695,10 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 	agent, err := s.agentRepo.GetByID(targetAgentID)
 	if err != nil {
 		return fmt.Errorf("agent not found: %v", err)
+	}
+
+	if agent.Type == "external" && agent.ExternalURL != "" {
+		return s.chatWithExternalAgent(ctx, session, agent, userMessage, modeKey, project, eventChan)
 	}
 
 	// Permission Check based on Agent Mode
@@ -676,7 +861,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 	for i := 0; i < maxTurns; i++ {
 		if ctx.Err() != nil {
-			eventChan <- ChatEvent{Type: ChatEventTerminated}
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventTerminated}
 			return nil
 		}
 		// Create a copy of messages to avoid race conditions if needed,
@@ -693,7 +878,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 		stream, err := aiClient.StreamChat(ctx, messages)
 		if err != nil {
-			eventChan <- ChatEvent{Type: ChatEventError, Content: err.Error()}
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventError, Content: err.Error()}
 			return nil
 		}
 
@@ -714,7 +899,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			// Handle Content
 			if chunk.Content != "" {
 				fullResponse += chunk.Content
-				eventChan <- ChatEvent{Type: ChatEventChunk, Content: chunk.Content}
+				eventChan <- chat.ChatEvent{Type: chat.ChatEventChunk, Content: chunk.Content}
 			}
 
 			// Handle Tool Calls (Accumulate)
@@ -754,7 +939,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		}
 		stream.Close()
 		if ctx.Err() != nil {
-			eventChan <- ChatEvent{Type: ChatEventTerminated}
+			eventChan <- chat.ChatEvent{Type: chat.ChatEventTerminated}
 			return nil
 		}
 
@@ -782,8 +967,8 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 			s.messageRepo.Create(aiMsg)
 			totalTokens += aiMsg.TokenCount
-			eventChan <- ChatEvent{
-				Type: ChatEventUsage,
+			eventChan <- chat.ChatEvent{
+				Type: chat.ChatEventUsage,
 				Extra: map[string]interface{}{"usage": aiMsg.TokenCount},
 			}
 
@@ -798,8 +983,8 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		// If no tool calls, we are done
 		if len(toolCalls) == 0 {
 			// Send done signal
-			eventChan <- ChatEvent{
-				Type: ChatEventDone,
+			eventChan <- chat.ChatEvent{
+				Type: chat.ChatEventDone,
 				Extra: map[string]interface{}{"usage": totalTokens},
 			}
 			return nil
