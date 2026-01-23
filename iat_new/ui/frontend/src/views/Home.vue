@@ -5,6 +5,4 @@
   </div>
 </template>
 
-<script setup lang="ts">
-// Engine 状态已在全局 Footer 中统一展示，这里暂不重复显示
-</script>
+<script setup lang="ts"></script>

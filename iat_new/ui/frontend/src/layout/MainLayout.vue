@@ -22,11 +22,31 @@
     <n-layout style="height: 100%">
       <n-layout-header bordered class="app-header">
         <div class="app-header__inner">
-          <div class="app-header__title">iat</div>
+          <div class="app-header__left">
+            <div class="app-header__title">iat</div>
+            <n-breadcrumb class="app-breadcrumb">
+              <n-breadcrumb-item
+                v-for="(item, idx) in breadcrumbItems"
+                :key="item.name"
+              >
+                <RouterLink
+                  v-if="idx !== breadcrumbItems.length - 1"
+                  :to="{ name: item.name }"
+                >
+                  {{ item.label }}
+                </RouterLink>
+                <span v-else>{{ item.label }}</span>
+              </n-breadcrumb-item>
+            </n-breadcrumb>
+          </div>
         </div>
       </n-layout-header>
       <n-layout-content :content-style="contentStyle">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive include="Chat">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </n-layout-content>
       <n-layout-footer bordered class="app-footer">
         <div class="app-footer__inner">
@@ -87,6 +107,26 @@ const showScriptDocs = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { engineStatus, engineStatusLabel } = useEngineStatus();
+
+const routeTitleMap = {
+  Home: "首页",
+  Projects: "项目列表",
+  Models: "模型管理",
+  Agents: "智能体管理",
+  Tools: "工具管理",
+  MCPs: "MCP 管理",
+  Modes: "模式管理",
+  Chat: "智能对话",
+};
+
+const breadcrumbItems = computed(() => {
+  return route.matched
+    .filter((r) => typeof r.name === "string" && r.name)
+    .map((r) => ({
+      name: r.name,
+      label: routeTitleMap[r.name] || r.name,
+    }));
+});
 
 const engineStatusDotClass = computed(() => {
   if (engineStatus.value === "Online") return "engine-status__dot--online";
@@ -168,7 +208,7 @@ function handleUpdateValue(key) {
 </script>
 <style scoped>
 :deep(.n-layout) {
-  height: 100%;
+  height: calc(100% - 48px - 45px);
 }
 
 .app-header {
@@ -182,9 +222,31 @@ function handleUpdateValue(key) {
   align-items: center;
 }
 
+.app-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
 .app-header__title {
   font-size: 16px;
   font-weight: 600;
+}
+
+.app-breadcrumb {
+  font-size: 12px;
+  opacity: 0.85;
+  min-width: 0;
+}
+
+.app-breadcrumb :deep(a) {
+  color: inherit;
+  text-decoration: none;
+}
+
+.app-breadcrumb :deep(a:hover) {
+  text-decoration: underline;
 }
 
 .app-footer {

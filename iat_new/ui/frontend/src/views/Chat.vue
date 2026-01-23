@@ -184,6 +184,8 @@
 </template>
 
 <script setup>
+defineOptions({ name: "Chat" });
+
 import { ref, onMounted, onUnmounted, computed, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
@@ -548,7 +550,7 @@ onMounted(() => {
 <style scoped>
 .chat-container {
   display: flex;
-  height: calc(100vh - 40px); /* Adjust based on layout */
+  height: 100%;
   background-color: #fff;
 }
 

@@ -425,6 +425,8 @@
 </template>
 
 <script setup>
+defineOptions({ name: "Chat" });
+
 import { ref, onMounted, onUnmounted, computed, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useMessage, useDialog, NIcon } from "naive-ui";
