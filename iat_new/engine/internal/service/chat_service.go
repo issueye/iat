@@ -49,30 +49,32 @@ type sessionCancel struct {
 }
 
 type ChatService struct {
-	projectRepo *repo.ProjectRepo
-	sessionRepo *repo.SessionRepo
-	agentRepo   *repo.AgentRepo
-	modelRepo   *repo.AIModelRepo
-	messageRepo *repo.MessageRepo
-	toolRepo    *repo.ToolInvocationRepo
-	mcpService  *MCPService
-	taskService *TaskService
-	mu          sync.Mutex
-	genCounter  uint64
-	cancelBySID map[uint]sessionCancel
+	projectRepo         *repo.ProjectRepo
+	sessionRepo         *repo.SessionRepo
+	agentRepo           *repo.AgentRepo
+	modelRepo           *repo.AIModelRepo
+	messageRepo         *repo.MessageRepo
+	toolRepo            *repo.ToolInvocationRepo
+	mcpService          *MCPService
+	taskService         *TaskService
+	subAgentTaskService *SubAgentTaskService
+	mu                  sync.Mutex
+	genCounter          uint64
+	cancelBySID         map[uint]sessionCancel
 }
 
-func NewChatService(mcpService *MCPService, taskService *TaskService) *ChatService {
+func NewChatService(mcpService *MCPService, taskService *TaskService, subAgentTaskService *SubAgentTaskService) *ChatService {
 	return &ChatService{
-		projectRepo: repo.NewProjectRepo(),
-		sessionRepo: repo.NewSessionRepo(),
-		agentRepo:   repo.NewAgentRepo(),
-		modelRepo:   repo.NewAIModelRepo(),
-		messageRepo: repo.NewMessageRepo(),
-		toolRepo:    repo.NewToolInvocationRepo(),
-		mcpService:  mcpService,
-		taskService: taskService,
-		cancelBySID: make(map[uint]sessionCancel),
+		projectRepo:         repo.NewProjectRepo(),
+		sessionRepo:         repo.NewSessionRepo(),
+		agentRepo:           repo.NewAgentRepo(),
+		modelRepo:           repo.NewAIModelRepo(),
+		messageRepo:         repo.NewMessageRepo(),
+		toolRepo:            repo.NewToolInvocationRepo(),
+		mcpService:          mcpService,
+		taskService:         taskService,
+		subAgentTaskService: subAgentTaskService,
+		cancelBySID:         make(map[uint]sessionCancel),
 	}
 }
 
@@ -98,7 +100,28 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 }
 
 // RunAgentInternal runs an agent synchronously for internal calls (like sub-agents)
-func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, eventChan chan<- chat.ChatEvent) (string, error) {
+// depth: current recursion depth, starts at 0 for root calls
+func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, depth int, parentTaskID string, eventChan chan<- chat.ChatEvent) (string, error) {
+	// Check recursion depth
+	if depth > SubAgentMaxDepth {
+		return "", fmt.Errorf("sub-agent recursion depth exceeded (max: %d, current: %d)", SubAgentMaxDepth, depth)
+	}
+
+	// Create SubAgentTask record
+	var subTask *model.SubAgentTask
+	if s.subAgentTaskService != nil {
+		var err error
+		subTask, err = s.subAgentTaskService.CreateTask(sessionID, agentName, query, parentTaskID, depth)
+		if err != nil {
+			return "", fmt.Errorf("failed to create sub-agent task: %v", err)
+		}
+		defer func() {
+			if subTask != nil {
+				s.subAgentTaskService.UnregisterCancel(subTask.TaskID)
+			}
+		}()
+	}
+
 	// 1. Find Agent
 	agents, err := s.agentRepo.List() // TODO: Optimize by Name lookup
 	if err != nil {
@@ -166,11 +189,14 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 	// 6. Loop
 	ctx := context.Background()
-	maxTurns := 30 
+	maxTurns := 30
 
 	for i := 0; i < maxTurns; i++ {
 		resp, err := aiClient.Chat(ctx, messages)
 		if err != nil {
+			if s.subAgentTaskService != nil && subTask != nil {
+				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", err.Error())
+			}
 			return "", err
 		}
 
@@ -186,8 +212,12 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 		// Check for Tool Calls
 		if len(resp.ToolCalls) == 0 {
-			// Done
-			return stripThinkContent(resp.Content), nil
+			// Done - update task status
+			result := stripThinkContent(resp.Content)
+			if s.subAgentTaskService != nil && subTask != nil {
+				s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskCompleted, result, "")
+			}
+			return result, nil
 		}
 
 		// Append Assistant Message with Tool Calls
@@ -264,13 +294,40 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				resultStr, _ = builtin.RunScript(sp, scriptArgs)
 				handled = true
 			case "call_subagent":
-				// Recursive call
+				// Recursive call with depth tracking
 				an, _ := args["agentName"].(string)
 				q, _ := args["query"].(string)
+				taskID := ""
+				if subTask != nil {
+					taskID = subTask.TaskID
+				}
 				var subErr error
-				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode, eventChan)
+				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode, depth+1, taskID, eventChan)
 				if subErr != nil {
 					resultStr = fmt.Sprintf("Error calling sub-agent: %v", subErr)
+				}
+				handled = true
+			case "check_subagent_status":
+				// Query sub-agent task status
+				queryTaskID, _ := args["taskId"].(string)
+				if s.subAgentTaskService != nil && queryTaskID != "" {
+					task, err := s.subAgentTaskService.GetTask(queryTaskID)
+					if err != nil {
+						resultStr = fmt.Sprintf("Error: task not found: %v", err)
+					} else {
+						statusData := map[string]interface{}{
+							"taskId":    task.TaskID,
+							"agentName": task.AgentName,
+							"status":    task.Status,
+							"depth":     task.Depth,
+							"result":    task.Result,
+							"error":     task.Error,
+						}
+						b, _ := json.Marshal(statusData)
+						resultStr = string(b)
+					}
+				} else {
+					resultStr = "Error: SubAgentTaskService not available or taskId missing"
 				}
 				handled = true
 			case "manage_tasks":
@@ -380,6 +437,9 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 		}
 	}
 
+	if s.subAgentTaskService != nil && subTask != nil {
+		s.subAgentTaskService.UpdateStatus(subTask.TaskID, model.SubAgentTaskFailed, "", "max turns exceeded")
+	}
 	return "", fmt.Errorf("max turns exceeded")
 }
 
@@ -968,7 +1028,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			s.messageRepo.Create(aiMsg)
 			totalTokens += aiMsg.TokenCount
 			eventChan <- chat.ChatEvent{
-				Type: chat.ChatEventUsage,
+				Type:  chat.ChatEventUsage,
 				Extra: map[string]interface{}{"usage": aiMsg.TokenCount},
 			}
 
@@ -984,7 +1044,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		if len(toolCalls) == 0 {
 			// Send done signal
 			eventChan <- chat.ChatEvent{
-				Type: chat.ChatEventDone,
+				Type:  chat.ChatEventDone,
 				Extra: map[string]interface{}{"usage": totalTokens},
 			}
 			return nil

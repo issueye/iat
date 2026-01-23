@@ -17,19 +17,20 @@ func NewServer(addr string) *Server {
 
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
-	
+
 	// Initialize Services
 	projectSvc := service.NewProjectService()
 	indexSvc := service.NewIndexService()
 	mcpSvc := service.NewMCPService()
-	taskSvc := service.NewTaskService(nil) // TODO: Handle SSE for tasks
-	chatSvc := service.NewChatService(mcpSvc, taskSvc)
+	taskSvc := service.NewTaskService(nil)                 // TODO: Handle SSE for tasks
+	subAgentTaskSvc := service.NewSubAgentTaskService(nil) // TODO: Handle SSE for sub-agent tasks
+	chatSvc := service.NewChatService(mcpSvc, taskSvc, subAgentTaskSvc)
 	sessionSvc := service.NewSessionService()
 	modelSvc := service.NewAIModelService()
 	agentSvc := service.NewAgentService()
 	toolSvc := service.NewToolService()
 	modeSvc := service.NewModeService()
-	
+
 	// Initialize Handlers
 	projectHandler := handler.NewProjectHandler(projectSvc, indexSvc)
 	chatHandler := handler.NewChatHandler(chatSvc)
@@ -49,7 +50,7 @@ func (s *Server) Start() error {
 	})
 
 	mux.HandleFunc("/api/runtime/test", runtimeTestHandler.Run)
-	
+
 	// Projects
 	mux.HandleFunc("/api/projects", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
@@ -245,7 +246,7 @@ func (s *Server) Start() error {
 
 	// Chat Stream
 	mux.HandleFunc("/api/chat/stream", chatHandler.Stream)
-	
+
 	return http.ListenAndServe(s.addr, handler)
 }
 

@@ -278,14 +278,29 @@ func GetEinoTools(mode string) []*schema.ToolInfo {
 	// Call Sub-agent
 	infos = append(infos, &schema.ToolInfo{
 		Name: "call_subagent",
-		Desc: "Call another specialized agent to perform a task",
+		Desc: "Call another specialized agent to perform a task. Supports async mode with wait=false.",
 		ParamsOneOf: mustParseSchema(`{
 			"type": "object",
 			"properties": {
-				"agentName": {"type": "string", "description": "Name of the agent to call"},
-				"query":     {"type": "string", "description": "The task or question for the sub-agent"}
+				"agentName":        {"type": "string", "description": "Name of the agent to call"},
+				"query":            {"type": "string", "description": "The task or question for the sub-agent"},
+				"wait":             {"type": "boolean", "description": "Whether to wait for completion (default: true). Set to false for async execution."},
+				"context_fragments": {"type": "array", "items": {"type": "string"}, "description": "Optional context snippets to pass to the sub-agent"}
 			},
 			"required": ["agentName", "query"]
+		}`),
+	})
+
+	// Check Sub-agent Status
+	infos = append(infos, &schema.ToolInfo{
+		Name: "check_subagent_status",
+		Desc: "Check the status of an async sub-agent task",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"taskId": {"type": "string", "description": "The task ID returned by call_subagent"}
+			},
+			"required": ["taskId"]
 		}`),
 	})
 

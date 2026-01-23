@@ -42,6 +42,7 @@ func InitDB() error {
 		&model.Mode{},
 		&model.MCPServer{},
 		&model.Task{},
+		&model.SubAgentTask{},
 	)
 	if err != nil {
 		return err
