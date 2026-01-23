@@ -138,9 +138,14 @@
           </template>
           <template #footer="{ item }">
             <div class="message-footer">
-              <n-button text color="#8a2be2">prompt</n-button>
+              <n-button text color="#8a2be2" @click="showPromptModalFn(item)">
+                {{ item.type === "tool" ? "输出" : "输入" }}
+              </n-button>
+
               <!-- token -->
-              <span class="token-usage">输出 {{ item.tokenUsage }}</span>
+              <span class="token-usage" v-if="item.type !== 'tool'">
+                TOKEN {{ item.tokenUsage }}
+              </span>
             </div>
           </template>
         </BubbleList>
@@ -188,6 +193,37 @@
         placeholder="会话名称"
         autofocus
       />
+    </n-modal>
+    <!-- Prompt Modal -->
+    <n-modal
+      v-model:show="showPromptModal"
+      preset="dialog"
+      :title="currentViewPrompt.type === 'tool' ? '工具调用' : '输入'"
+      style="width: 80%"
+    >
+      <pre
+        style="
+          text-align: left;
+          max-height: 80vh;
+          overflow: auto;
+          white-space: pre-wrap;
+        "
+      >
+        {{ currentViewPrompt }}
+        </pre
+      >
+      <!-- <XMarkdown
+        :markdown="currentViewPrompt"
+        default-theme-mode="light"
+        style="
+          text-align: left;
+          margin-top: 8px;
+          width: 100%;
+          max-height: 80vh;
+          overflow: auto;
+        "
+        :code-x-props="{ enableCodeLineNumber: true }"
+      /> -->
     </n-modal>
   </div>
 </template>
@@ -253,14 +289,6 @@ const lastAssistantMessage = computed(() => {
   return null;
 });
 
-const displayMessages = computed(() => {
-  return messages.value.map((m) => ({
-    ...m,
-    role: m.role === ChatRoles.Tool ? "assistant" : m.role,
-    time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString() : "",
-  }));
-});
-
 const formatTime = (time) => {
   return new Date(time).toLocaleTimeString();
 };
@@ -297,6 +325,31 @@ const agentOptions = computed(() => {
     value: a.id,
   }));
 });
+
+const showPromptModalFn = (item) => {
+  switch (item.type) {
+    case "tool":
+      {
+        // toolOutput
+        currentViewPrompt.value = item.toolOutput || "";
+      }
+      break;
+    case "message":
+      {
+        currentViewPrompt.value = item.prompt || "";
+        if (currentViewPrompt.value) {
+          currentViewPrompt.value = JSON.stringify(
+            JSON.parse(currentViewPrompt.value),
+            null,
+            2,
+          );
+        }
+      }
+      break;
+  }
+
+  showPromptModal.value = true;
+};
 
 // Helper Functions
 function parseThinkContent(text) {
