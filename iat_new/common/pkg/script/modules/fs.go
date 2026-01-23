@@ -3,7 +3,7 @@ package modules
 import (
 	"os"
 
-	"iat/engine/pkg/tools/builtin"
+	"iat/common/pkg/tools"
 
 	"github.com/dop251/goja"
 )
@@ -69,9 +69,9 @@ func init() {
 
 func registerFS(vm *goja.Runtime) {
 	vm.Set("fs", map[string]interface{}{
-		"readFile":  builtin.ReadFile,
-		"writeFile": builtin.WriteFile,
-		"listFiles": builtin.ListFiles,
+		"readFile":  tools.ReadFile,
+		"writeFile": tools.WriteFile,
+		"listFiles": tools.ListFiles,
 		"remove": func(path string) error {
 			return os.RemoveAll(path)
 		},

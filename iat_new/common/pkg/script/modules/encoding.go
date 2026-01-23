@@ -57,10 +57,6 @@ func init() {
 	})
 }
 
-func registerEncoding(vm *goja.Runtime) {
-	// Deprecated: used by individual registers now
-}
-
 func registerJSON(vm *goja.Runtime) {
 	vm.Set("json", map[string]interface{}{
 		"stringify": func(v interface{}) (string, error) {

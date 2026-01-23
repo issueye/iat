@@ -1,371 +1,317 @@
 package builtin
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"iat/common/model"
-
 	"iat/common/pkg/consts"
+	"iat/common/pkg/tools"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
 )
 
 var ToolFunctions = map[string]interface{}{
-	"ReadFile":   ReadFile,
-	"WriteFile":  WriteFile,
-	"ListFiles":  ListFiles,
-	"RunCommand": RunCommand,
-	"RunScript":  RunScript,
-	"HttpGet":    HttpGet,
-	"HttpPost":   HttpPost,
-}
-
-func GetEinoTools(modeKey string) []*schema.ToolInfo {
-	var tools []*schema.ToolInfo
-	for _, t := range BuiltinTools {
-		// Permission Filter based on Agent Name
-		if modeKey == consts.ChatMode {
-			// Chat agent gets NO tools
-			continue
-		} else if modeKey == consts.PlanMode {
-			// Plan agent only gets file operations (read/write/list)
-			// We can filter by name or some property.
-			// Assuming file operations are: read_file, write_file, list_files, read_file_range, diff_file
-			if t.Name != consts.ToolReadFile.ToString() &&
-				t.Name != consts.ToolWriteFile.ToString() &&
-				t.Name != consts.ToolListFiles.ToString() &&
-				t.Name != consts.ToolReadFileRange.ToString() &&
-				t.Name != consts.ToolDiffFile.ToString() &&
-				t.Name != "manage_tasks" &&
-				t.Name != "call_subagent" &&
-				t.Name != "review_output" {
-				continue
-			}
-		} else if modeKey == consts.BuildMode {
-			// Build agent gets ALL tools
-		} else {
-			// Custom agents or unknown builtins: default to ALL (or based on binding if we implement binding check here)
-			// If we are strictly following "Chat/Plan/Build" logic, we might restrict others too.
-			// But for custom agents, they usually have explicit tool bindings in DB.
-			// This function currently returns ALL builtin tools filtered by hardcoded logic.
-			// Ideally, we should pass the list of allowed tool names.
-		}
-
-		var s jsonschema.Schema
-		if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
-			// Skip tools with invalid schema or log error
-			// For now, we print error and continue, but in production we should handle better
-			fmt.Printf("Failed to parse schema for tool %s: %v\n", t.Name, err)
-			continue
-		}
-		tools = append(tools, &schema.ToolInfo{
-			Name:        t.Name,
-			Desc:        t.Description,
-			ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
-		})
-	}
-	return tools
-}
-
-// WrapToolFunction wraps the tool function to match Eino's Tool implementation
-func WrapToolFunction(name string, fn interface{}) func(ctx context.Context, input map[string]interface{}) (string, error) {
-	// TODO: Implement reflection based wrapper or specific wrappers
-	// Since Eino tools usually take (ctx, input) and return (output, error)
-	// We might need to adapt our simple functions to this signature.
-	// For now, let's keep it simple and just return a placeholder or specific wrappers.
-
-	// Real implementation would use reflection to map input map to function arguments.
-	return func(ctx context.Context, input map[string]interface{}) (string, error) {
-		return "", fmt.Errorf("WrapToolFunction not implemented for %s", name)
-	}
+	"ReadFile":      tools.ReadFile,
+	"WriteFile":     tools.WriteFile,
+	"ListFiles":     tools.ListFiles,
+	"RunCommand":    tools.RunCommand,
+	"RunScript":     tools.RunScript,
+	"ReadFileRange": tools.ReadFileRange,
+	"DiffFile":      tools.DiffFile,
 }
 
 var BuiltinTools = []model.Tool{
-	// File Operations
 	{
-		Name:        consts.ToolReadFile.ToString(),
-		Description: "Read the contents of a file from the local filesystem",
+		Name:        "read_file",
+		Description: "Read the content of a file (limit 100KB)",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "ReadFile",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The absolute path to the file to read"
-				}
+				"path": {"type": "string", "description": "Path to the file"}
 			},
 			"required": ["path"]
 		}`,
 	},
 	{
-		Name:        consts.ToolReadFileRange.ToString(),
-		Description: "Read a specific range of lines from a file (useful for large files)",
+		Name:        "write_file",
+		Description: "Write content to a file",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "ReadFileRange",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The absolute path to the file to read"
-				},
-				"startLine": {
-					"type": "integer",
-					"description": "The line number to start reading from (1-based)"
-				},
-				"limit": {
-					"type": "integer",
-					"description": "The number of lines to read"
-				}
-			},
-			"required": ["path", "startLine", "limit"]
-		}`,
-	},
-	{
-		Name:        consts.ToolDiffFile.ToString(),
-		Description: "Show the differences between two files",
-		Type:        consts.ToolTypeBuiltin,
-		Content:     "DiffFile",
-		Parameters: `{
-			"type": "object",
-			"properties": {
-				"path1": {
-					"type": "string",
-					"description": "The absolute path to the first file"
-				},
-				"path2": {
-					"type": "string",
-					"description": "The absolute path to the second file"
-				}
-			},
-			"required": ["path1", "path2"]
-		}`,
-	},
-	{
-		Name:        consts.ToolWriteFile.ToString(),
-		Description: "Write content to a file on the local filesystem (overwrites if exists)",
-		Type:        consts.ToolTypeBuiltin,
-		Content:     "WriteFile",
-		Parameters: `{
-			"type": "object",
-			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The absolute path to the file to write"
-				},
-				"content": {
-					"type": "string",
-					"description": "The content to write to the file"
-				}
+				"path":    {"type": "string", "description": "Path to the file"},
+				"content": {"type": "string", "description": "Content to write"}
 			},
 			"required": ["path", "content"]
 		}`,
 	},
 	{
-		Name:        consts.ToolListFiles.ToString(),
-		Description: "List files and directories in a given directory path",
+		Name:        "list_files",
+		Description: "List files in a directory",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "ListFiles",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"path": {
-					"type": "string",
-					"description": "The absolute path to the directory to list"
-				}
+				"path": {"type": "string", "description": "Directory path"}
 			},
 			"required": ["path"]
 		}`,
 	},
-
-	// Command Execution
 	{
-		Name:        consts.ToolRunCommand.ToString(),
+		Name:        "run_command",
 		Description: "Execute a shell command",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "RunCommand",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"command": {
-					"type": "string",
-					"description": "The command to execute (e.g., 'ls', 'git')"
-				},
+				"command": {"type": "string", "description": "Command to execute"},
 				"args": {
 					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "List of arguments for the command"
+					"items": {"type": "string"},
+					"description": "Command arguments"
 				}
 			},
 			"required": ["command"]
 		}`,
 	},
 	{
-		Name:        consts.ToolRunScript.ToString(),
-		Description: "Execute a script file (python, js, sh, go)",
+		Name:        "run_script",
+		Description: "Execute a python/js/sh/go script",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "RunScript",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"scriptPath": {
-					"type": "string",
-					"description": "The absolute path to the script file"
-				},
+				"scriptPath": {"type": "string", "description": "Path to script file"},
 				"args": {
 					"type": "array",
-					"items": {
-						"type": "string"
-					},
-					"description": "List of arguments for the script"
+					"items": {"type": "string"},
+					"description": "Script arguments"
 				}
 			},
 			"required": ["scriptPath"]
 		}`,
 	},
-
-	// Network Requests
 	{
-		Name:        consts.ToolHttpGet.ToString(),
-		Description: "Perform an HTTP GET request",
+		Name:        "read_file_range",
+		Description: "Read a range of lines from a file",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "HttpGet",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"url": {
-					"type": "string",
-					"description": "The URL to send the GET request to"
-				}
+				"path":      {"type": "string", "description": "Path to the file"},
+				"startLine": {"type": "integer", "description": "Starting line number (1-based)"},
+				"limit":     {"type": "integer", "description": "Number of lines to read"}
 			},
-			"required": ["url"]
+			"required": ["path", "startLine", "limit"]
 		}`,
 	},
 	{
-		Name:        consts.ToolHttpPost.ToString(),
-		Description: "Perform an HTTP POST request",
+		Name:        "diff_file",
+		Description: "Compare two files and return pretty diff",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "HttpPost",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"url": {
-					"type": "string",
-					"description": "The URL to send the POST request to"
-				},
-				"contentType": {
-					"type": "string",
-					"description": "Content-Type header (default: application/json)"
-				},
-				"body": {
-					"type": "string",
-					"description": "The request body"
-				}
+				"path1": {"type": "string", "description": "Path to first file"},
+				"path2": {"type": "string", "description": "Path to second file"}
 			},
-			"required": ["url", "body"]
-		}`,
-	},
-	{
-		Name:        consts.ToolIndexProject.ToString(),
-		Description: "Index projects for searching sessions by project name",
-		Type:        consts.ToolTypeBuiltin,
-		Content:     "IndexProject",
-		Parameters: `{
-			"type": "object",
-			"properties": {
-				"projectId": {
-					"type": "number",
-					"description": "Project ID to index (default: current session project)"
-				},
-				"all": {
-					"type": "boolean",
-					"description": "Index all projects"
-				}
-			}
-		}`,
-	},
-	{
-		Name:        "call_subagent",
-		Description: "Call another agent (SubAgent) to perform a specific task",
-		Type:        consts.ToolTypeBuiltin,
-		Content:     "CallSubAgent",
-		Parameters: `{
-			"type": "object",
-			"properties": {
-				"agentName": {
-					"type": "string",
-					"description": "The name of the agent to call"
-				},
-				"query": {
-					"type": "string",
-					"description": "The task or query for the sub-agent"
-				}
-			},
-			"required": ["agentName", "query"]
+			"required": ["path1", "path2"]
 		}`,
 	},
 	{
 		Name:        "manage_tasks",
-		Description: "Manage a task list for the current session (add, update, delete, list)",
+		Description: "Create, update, delete or list tasks in the current session",
 		Type:        consts.ToolTypeBuiltin,
-		Content:     "ManageTasks",
 		Parameters: `{
 			"type": "object",
 			"properties": {
-				"action": {
-					"type": "string",
-					"enum": ["add", "update", "delete", "list"],
-					"description": "The action to perform"
-				},
-				"content": {
-					"type": "string",
-					"description": "Task content/description (for add/update)"
-				},
-				"id": {
-					"type": "number",
-					"description": "Task ID (for update/delete)"
-				},
-				"status": {
-					"type": "string",
-					"enum": ["pending", "in_progress", "completed", "failed"],
-					"description": "Task status (for update)"
-				},
-				"priority": {
-					"type": "string",
-					"enum": ["high", "medium", "low"],
-					"description": "Task priority (for add/update)"
-				}
+				"action":   {"type": "string", "enum": ["add", "update", "delete", "list"], "description": "Action to perform"},
+				"id":       {"type": "integer", "description": "Task ID (required for update/delete)"},
+				"content":  {"type": "string", "description": "Task content (required for add)"},
+				"status":   {"type": "string", "enum": ["pending", "in_progress", "completed"], "description": "Task status (for update)"},
+				"priority": {"type": "string", "enum": ["low", "medium", "high"], "description": "Task priority (for add)"},
+				"parentId": {"type": "integer", "description": "Parent task ID (for sub-tasks)"}
 			},
 			"required": ["action"]
 		}`,
 	},
-	{
-		Name:        "review_output",
-		Description: "Review the output of a task or sub-agent execution",
-		Type:        consts.ToolTypeBuiltin,
-		Content:     "ReviewOutput",
-		Parameters: `{
+}
+
+func mustParseSchema(jsonStr string) *schema.ParamsOneOf {
+	var s jsonschema.Schema
+	if err := json.Unmarshal([]byte(jsonStr), &s); err != nil {
+		panic("invalid builtin tool schema: " + err.Error())
+	}
+	return schema.NewParamsOneOfByJSONSchema(&s)
+}
+
+// Wrapper for Eino
+func GetEinoTools(mode string) []*schema.ToolInfo {
+	var infos []*schema.ToolInfo
+
+	// Read File
+	infos = append(infos, &schema.ToolInfo{
+		Name: "read_file",
+		Desc: "Read the content of a file (limit 100KB)",
+		ParamsOneOf: mustParseSchema(`{
 			"type": "object",
 			"properties": {
-				"taskId": {
-					"type": "number",
-					"description": "The ID of the task being reviewed (optional)"
-				},
-				"passed": {
-					"type": "boolean",
-					"description": "Whether the output passed the review"
-				},
-				"comment": {
-					"type": "string",
-					"description": "Review comments or feedback"
-				}
+				"path": {"type": "string", "description": "Path to the file"}
 			},
-			"required": ["passed", "comment"]
-		}`,
-	},
+			"required": ["path"]
+		}`),
+	})
+
+	// Read File Range
+	infos = append(infos, &schema.ToolInfo{
+		Name: "read_file_range",
+		Desc: "Read a range of lines from a file",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"path":      {"type": "string", "description": "Path to the file"},
+				"startLine": {"type": "integer", "description": "Starting line number (1-based)"},
+				"limit":     {"type": "integer", "description": "Number of lines to read"}
+			},
+			"required": ["path", "startLine", "limit"]
+		}`),
+	})
+
+	// List Files
+	infos = append(infos, &schema.ToolInfo{
+		Name: "list_files",
+		Desc: "List files in a directory",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"path": {"type": "string", "description": "Directory path"}
+			},
+			"required": ["path"]
+		}`),
+	})
+
+	// Diff File
+	infos = append(infos, &schema.ToolInfo{
+		Name: "diff_file",
+		Desc: "Compare two files and return pretty diff",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"path1": {"type": "string", "description": "Path to first file"},
+				"path2": {"type": "string", "description": "Path to second file"}
+			},
+			"required": ["path1", "path2"]
+		}`),
+	})
+
+	// Manage Tasks
+	infos = append(infos, &schema.ToolInfo{
+		Name: "manage_tasks",
+		Desc: "Create, update, delete or list tasks in the current session",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"action":   {"type": "string", "enum": ["add", "update", "delete", "list"], "description": "Action to perform"},
+				"id":       {"type": "integer", "description": "Task ID (required for update/delete)"},
+				"content":  {"type": "string", "description": "Task content (required for add)"},
+				"status":   {"type": "string", "enum": ["pending", "in_progress", "completed"], "description": "Task status (for update)"},
+				"priority": {"type": "string", "enum": ["low", "medium", "high"], "description": "Task priority (for add)"},
+				"parentId": {"type": "integer", "description": "Parent task ID (for sub-tasks)"}
+			},
+			"required": ["action"]
+		}`),
+	})
+
+	if mode == "build" {
+		// Write File
+		infos = append(infos, &schema.ToolInfo{
+			Name: "write_file",
+			Desc: "Write content to a file",
+			ParamsOneOf: mustParseSchema(`{
+				"type": "object",
+				"properties": {
+					"path":    {"type": "string", "description": "Path to the file"},
+					"content": {"type": "string", "description": "Content to write"}
+				},
+				"required": ["path", "content"]
+			}`),
+		})
+
+		// Run Command
+		infos = append(infos, &schema.ToolInfo{
+			Name: "run_command",
+			Desc: "Execute a shell command",
+			ParamsOneOf: mustParseSchema(`{
+				"type": "object",
+				"properties": {
+					"command": {"type": "string", "description": "Command to execute"},
+					"args": {
+						"type": "array",
+						"items": {"type": "string"},
+						"description": "Command arguments"
+					}
+				},
+				"required": ["command"]
+			}`),
+		})
+
+		// Run Script
+		infos = append(infos, &schema.ToolInfo{
+			Name: "run_script",
+			Desc: "Execute a python/js/sh/go script",
+			ParamsOneOf: mustParseSchema(`{
+				"type": "object",
+				"properties": {
+					"scriptPath": {"type": "string", "description": "Path to script file"},
+					"args": {
+						"type": "array",
+						"items": {"type": "string"},
+						"description": "Script arguments"
+					}
+				},
+				"required": ["scriptPath"]
+			}`),
+		})
+	}
+
+	// Call Sub-agent
+	infos = append(infos, &schema.ToolInfo{
+		Name: "call_subagent",
+		Desc: "Call another specialized agent to perform a task",
+		ParamsOneOf: mustParseSchema(`{
+			"type": "object",
+			"properties": {
+				"agentName": {"type": "string", "description": "Name of the agent to call"},
+				"query":     {"type": "string", "description": "The task or question for the sub-agent"}
+			},
+			"required": ["agentName", "query"]
+		}`),
+	})
+
+	return infos
+}
+
+// Helper to resolve paths safely
+func ResolvePathInBase(base, user string) (string, error) {
+	return tools.ResolvePathInBase(base, user)
+}
+
+// Re-export implementations for direct call if needed
+func ReadFile(path string) (string, error)           { return tools.ReadFile(path) }
+func WriteFile(path, content string) (string, error) { return tools.WriteFile(path, content) }
+func ListFiles(path string) (string, error)          { return tools.ListFiles(path) }
+func ReadFileRange(path string, start, limit int) (string, error) {
+	return tools.ReadFileRange(path, start, limit)
+}
+func DiffFile(path1, path2 string) (string, error) { return tools.DiffFile(path1, path2) }
+func RunCommand(command string, args []string) (string, error) {
+	return tools.RunCommand(command, args)
+}
+func RunScript(path string, args []string) (string, error) { return tools.RunScript(path, args) }
+
+// Http helpers for script modules
+func HttpGet(url string) (string, error) { return tools.HttpGet(url) }
+func HttpPost(url, contentType, body string) (string, error) {
+	return tools.HttpPost(url, contentType, body)
 }

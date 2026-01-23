@@ -3,7 +3,7 @@ package modules
 import (
 	"os"
 
-	"iat/engine/pkg/tools/builtin"
+	"iat/common/pkg/tools"
 
 	"github.com/dop251/goja"
 )
@@ -48,6 +48,6 @@ func registerOS(vm *goja.Runtime) {
 	vm.Set("os", map[string]interface{}{
 		"getenv": os.Getenv,
 		"setenv": os.Setenv,
-		"exec":   builtin.RunCommand,
+		"exec":   tools.RunCommand,
 	})
 }

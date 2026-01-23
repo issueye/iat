@@ -2,7 +2,7 @@ package service
 
 import (
 	"iat/common/model"
-	"iat/engine/pkg/script"
+	"iat/common/pkg/script"
 	"iat/engine/internal/repo"
 )
 
@@ -55,5 +55,5 @@ func (s *ScriptService) RunScript(id uint) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	return val.Export(), nil
+	return val, nil
 }

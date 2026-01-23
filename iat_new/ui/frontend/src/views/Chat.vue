@@ -101,51 +101,60 @@
         </div>
       </div>
 
-      <div class="messages-area">
-        <div v-for="(msg, index) in messages" :key="index" class="message-item">
-          <div class="message-role">
-            <n-tag
-              size="small"
-              :type="msg.role === 'user' ? 'primary' : 'success'"
-            >
-              {{ msg.role }}
-            </n-tag>
-            <span class="message-time">{{
-              new Date(msg.createdAt).toLocaleTimeString()
-            }}</span>
-          </div>
-          <div class="message-content">
-            <pre class="content-pre">{{ msg.content }}</pre>
-
-            <!-- Tool Calls -->
-            <div v-if="msg.role === 'tool'" class="tool-call">
-              <div class="tool-header">Tool: {{ msg.toolName }}</div>
-              <pre class="tool-args">{{ msg.toolArguments }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="input-area">
-        <n-input
-          v-model:value="inputText"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          placeholder="输入消息... (Ctrl+Enter 发送)"
-          @keydown.ctrl.enter="handleSend(inputText)"
-        />
-        <n-button
-          type="primary"
-          class="send-btn"
-          @click="handleSend(inputText)"
+      <div class="chat-main-content">
+        <BubbleList
+          :list="messages"
           :loading="isGenerating"
-          :disabled="!inputText.trim() && !isGenerating"
+          class="messages-area"
+          :bubble-props="{ showTime: true }"
         >
-          <template #icon>
-            <n-icon><ChevronForwardOutline /></n-icon>
+          <template #avatar="{ item }">
+            <n-avatar size="medium">
+              {{ item.role === "用户" ? "user" : "智能体" }}
+            </n-avatar>
           </template>
-          发送
-        </n-button>
+          <template #header="{ item }">
+            <div class="message-header">
+              <span>{{ item.role === "user" ? "用户" : "智能体" }}</span>
+              <span class="message-time">{{ formatTime(item.createdAt) }}</span>
+            </div>
+          </template>
+          <template #content="{ item }">
+            <div v-if="item.type === 'tool'" class="tool-call-bubble">
+              <div class="tool-header">
+                <n-icon><ContractOutline /></n-icon>
+                <span>工具调用: {{ item.toolName }}</span>
+              </div>
+              <pre class="tool-args">{{ item.toolArguments }}</pre>
+            </div>
+            <div v-else>
+              <XMarkdown
+                :markdown="item.content"
+                default-theme-mode="light"
+                style="text-align: left; margin-top: 8px"
+                :code-x-props="{ enableCodeLineNumber: true }"
+              />
+            </div>
+          </template>
+          <template #footer="{ item }">
+            <div class="message-footer">
+              <n-button text color="#8a2be2">prompt</n-button>
+              <!-- token -->
+              <span class="token-usage">输出 {{ item.tokenUsage }}</span>
+            </div>
+          </template>
+        </BubbleList>
+
+        <div class="input-area">
+          <Sender
+            v-model="inputText"
+            :disabled="isGenerating"
+            :loading="isGenerating"
+            placeholder="输入消息... (Ctrl+Enter 发送)"
+            @submit="handleSend"
+            @cancel="handleStop"
+          />
+        </div>
       </div>
     </div>
 
@@ -244,18 +253,23 @@ const lastAssistantMessage = computed(() => {
   return null;
 });
 
+const displayMessages = computed(() => {
+  return messages.value.map((m) => ({
+    ...m,
+    role: m.role === ChatRoles.Tool ? "assistant" : m.role,
+    time: m.createdAt ? new Date(m.createdAt).toLocaleTimeString() : "",
+  }));
+});
+
+const formatTime = (time) => {
+  return new Date(time).toLocaleTimeString();
+};
+
 const modeOptions = [
   { label: "对话 (Chat)", value: ChatModes.Chat },
   { label: "计划 (Plan)", value: ChatModes.Plan },
   { label: "构建 (Build)", value: ChatModes.Build },
 ];
-
-const totalTokenUsage = computed(() => {
-  return messages.value.reduce((sum, m) => {
-    const n = Number(m?.tokenUsage || 0);
-    return sum + (Number.isFinite(n) ? n : 0);
-  }, 0);
-});
 
 // UI State
 const showCreateModal = ref(false);
@@ -373,10 +387,15 @@ watch(currentSessionId, async (newVal) => {
       const msgs = await api.getSessionMessages(newVal);
       // Convert backend message format to UI format
       messages.value = (msgs || []).map((m) => ({
+        type: m.toolName ? "tool" : "message",
         role: m.role,
         content: m.content,
         createdAt: m.createdAt,
-        // Handle tool calls if needed
+        prompt: m.prompt,
+        toolName: m.toolName,
+        toolArguments: m.toolArguments,
+        toolOutput: m.toolOutput,
+        tokenUsage: m.tokenCount,
       }));
     } catch (e) {
       message.error("加载消息失败: " + e.message);
@@ -450,20 +469,23 @@ async function loadSessions(projectId) {
 }
 
 // Chat Logic
-async function handleSend(content) {
+async function handleSend(val) {
+  const content = typeof val === "string" ? val : inputText.value;
+
   if (isGenerating.value) return;
-  if (!content.trim()) return;
+  if (!content || !content.trim()) return;
 
   inputText.value = "";
   isGenerating.value = true;
   generationStatus.value = ThinkingStatuses.Start;
 
   // Add User Message
-  messages.value.push({
+  const sendData = {
     role: ChatRoles.User,
     content: content,
     createdAt: new Date().toISOString(),
-  });
+  };
+  messages.value.push(sendData);
 
   // Add Assistant Placeholder
   const aiMsgIndex =
@@ -617,6 +639,14 @@ onMounted(() => {
   border-bottom: 1px solid #eee;
 }
 
+.chat-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  gap: 10px;
+}
+
 .header-controls {
   display: flex;
   gap: 10px;
@@ -625,10 +655,9 @@ onMounted(() => {
 .messages-area {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background-color: #fafafa;
-  margin-bottom: 10px;
-  border-radius: 4px;
+  padding: 0; /* BubbleList handles padding */
+  background-color: transparent; /* BubbleList handles background */
+  margin-bottom: 0;
 }
 
 .message-item {
@@ -643,6 +672,7 @@ onMounted(() => {
 }
 
 .message-time {
+  margin-left: 8px;
   font-size: 12px;
   color: #ccc;
 }
@@ -676,5 +706,46 @@ onMounted(() => {
   word-break: break-word;
   font-family: monospace;
   font-size: 12px;
+}
+
+.tool-call-bubble {
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  padding: 8px;
+  border-left: 4px solid #1890ff;
+}
+
+.message-footer {
+  display: flex;
+  gap: 8px;
+}
+
+.token-usage {
+  font-size: 12px;
+  color: #999;
+}
+
+:deep(.el-bubble-content) {
+  --bubble-content-max-width: 100% !important;
+}
+
+.tool-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.tool-args {
+  margin: 0;
+  font-size: 11px;
+  color: #333;
+  background: #fff;
+  padding: 4px;
+  border-radius: 4px;
+  overflow: auto;
 }
 </style>

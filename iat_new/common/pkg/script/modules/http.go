@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"iat/engine/pkg/tools/builtin"
+	"iat/common/pkg/tools"
 
 	"github.com/dop251/goja"
 )
@@ -52,8 +52,8 @@ func init() {
 
 func registerHTTP(vm *goja.Runtime) {
 	vm.Set("http", map[string]interface{}{
-		"get":     builtin.HttpGet,
-		"post":    builtin.HttpPost,
+		"get":     tools.HttpGet,
+		"post":    tools.HttpPost,
 		"request": func(method, url string, headers map[string]string, body string) (map[string]interface{}, error) {
 			client := &http.Client{Timeout: 30 * time.Second}
 			req, err := http.NewRequest(method, url, strings.NewReader(body))

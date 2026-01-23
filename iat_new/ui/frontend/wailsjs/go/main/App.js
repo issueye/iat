@@ -6,8 +6,8 @@ export function CreateAIModel(arg1) {
   return window['go']['main']['App']['CreateAIModel'](arg1);
 }
 
-export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
-  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+export function CreateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['CreateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function CreateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
@@ -106,8 +106,8 @@ export function TestAIModel(arg1) {
   return window['go']['main']['App']['TestAIModel'](arg1);
 }
 
-export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
-  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+export function UpdateAgent(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
+  return window['go']['main']['App']['UpdateAgent'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
 }
 
 export function UpdateMCPServer(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {

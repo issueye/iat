@@ -1,4 +1,4 @@
-package builtin
+package tools
 
 import (
 	"fmt"
@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
@@ -254,42 +253,36 @@ func RunScript(scriptPath string, args []string) (string, error) {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("script execution failed: %v, output: %s", err, string(output))
+		return string(output), fmt.Errorf("script failed: %v, output: %s", err, string(output))
 	}
 	return string(output), nil
 }
 
-// --- Network Requests ---
-
+// Http helpers for script modules
 func HttpGet(url string) (string, error) {
-	client := http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(url)
+	resp, err := http.Get(url)
 	if err != nil {
-		return "", fmt.Errorf("http get failed: %v", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read body: %v", err)
+		return "", err
 	}
 	return string(body), nil
 }
 
-func HttpPost(url string, contentType string, body string) (string, error) {
-	client := http.Client{Timeout: 10 * time.Second}
-	if contentType == "" {
-		contentType = "application/json"
-	}
-	resp, err := client.Post(url, contentType, strings.NewReader(body))
+func HttpPost(url, contentType, body string) (string, error) {
+	resp, err := http.Post(url, contentType, strings.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("http post failed: %v", err)
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read body: %v", err)
+		return "", err
 	}
 	return string(respBody), nil
 }

@@ -1,39 +1,27 @@
 package script
 
 import (
-	"fmt"
+	"iat/common/pkg/script"
 	"iat/engine/pkg/tools/builtin"
 
 	"github.com/dop251/goja"
 )
 
 type ScriptEngine struct {
-	vm *goja.Runtime
+	engine *script.ScriptEngine
 }
 
 func NewScriptEngine() *ScriptEngine {
-	vm := goja.New()
-	
-	// Register builtin tools to JS environment
-	// This allows scripts to use built-in capabilities like file operations
+	commonEngine := script.NewScriptEngine()
+	vm := commonEngine.GetVM()
+
+	// Register engine-specific builtin tools to JS environment
 	for name, fn := range builtin.ToolFunctions {
 		vm.Set(name, fn)
 	}
-	
-	// Add console.log support
-	vm.Set("console", map[string]interface{}{
-		"log": func(call goja.FunctionCall) goja.Value {
-			var args []interface{}
-			for _, arg := range call.Arguments {
-				args = append(args, arg.Export())
-			}
-			fmt.Println(args...)
-			return goja.Undefined()
-		},
-	})
 
 	return &ScriptEngine{
-		vm: vm,
+		engine: commonEngine,
 	}
 }
 
@@ -44,20 +32,16 @@ func NewScriptEngineWithBaseDir(baseDir string) *ScriptEngine {
 }
 
 // Run executes a JS script
-func (e *ScriptEngine) Run(script string) (interface{}, error) {
-	val, err := e.vm.RunString(script)
-	if err != nil {
-		return nil, err
-	}
-	return val.Export(), nil
+func (e *ScriptEngine) Run(jsScript string) (interface{}, error) {
+	return e.engine.Run(jsScript)
 }
 
 // RegisterTool registers a Go function as a tool in the JS VM
 func (e *ScriptEngine) RegisterTool(name string, fn interface{}) {
-	e.vm.Set(name, fn)
+	e.engine.RegisterGlobal(name, fn)
 }
 
 // GetGlobalObject returns the global object of the VM
 func (e *ScriptEngine) GetGlobalObject() *goja.Object {
-	return e.vm.GlobalObject()
+	return e.engine.GetVM().GlobalObject()
 }

@@ -102,7 +102,7 @@ import {
 import ScriptDocsFloat from "../components/ScriptDocsFloat.vue";
 import { useEngineStatus } from "../useEngineStatus";
 
-const collapsed = ref(false);
+const collapsed = ref(true);
 const showScriptDocs = ref(false);
 const route = useRoute();
 const router = useRouter();

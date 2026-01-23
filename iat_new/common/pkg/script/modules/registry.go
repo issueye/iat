@@ -16,9 +16,9 @@ type FunctionDoc struct {
 }
 
 type ModuleDoc struct {
-	Name      string        `json:"name"`
-	Desc      string        `json:"desc"`
-	Functions []FunctionDoc `json:"functions"`
+	Name      string                 `json:"name"`
+	Desc      string                 `json:"desc"`
+	Functions []FunctionDoc          `json:"functions"`
 	Register  func(vm *goja.Runtime) `json:"-"`
 }
 
