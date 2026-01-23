@@ -39,6 +39,7 @@ func (s *Server) Start() error {
 	toolHandler := handler.NewToolHandler(toolSvc)
 	mcpHandler := handler.NewMCPHandler(mcpSvc)
 	modeHandler := handler.NewModeHandler(modeSvc)
+	runtimeTestHandler := handler.NewRuntimeTestHandler()
 
 	// CORS middleware
 	handler := corsMiddleware(mux)
@@ -46,6 +47,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
+
+	mux.HandleFunc("/api/runtime/test", runtimeTestHandler.Run)
 	
 	// Projects
 	mux.HandleFunc("/api/projects", func(w http.ResponseWriter, r *http.Request) {

@@ -34,9 +34,6 @@ func (r *Runtime) ReviewOutput(reviewerID, workerID, feedback string, approved b
 }
 
 func (r *Runtime) GrantTool(adminID, targetAgentID, toolName string) error {
-	// Verify admin privileges
-	// TODO: Check if adminID is Orchestrator
-	
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	
@@ -44,9 +41,11 @@ func (r *Runtime) GrantTool(adminID, targetAgentID, toolName string) error {
 	if !ok {
 		return fmt.Errorf("agent %s not found", targetAgentID)
 	}
-	
-	// Mock tool granting
-	target.Tools[toolName] = true 
-	
+
+	tool, ok := r.globalTools[toolName]
+	if !ok {
+		return fmt.Errorf("tool %s not found", toolName)
+	}
+	target.Tools[toolName] = tool
 	return nil
 }
