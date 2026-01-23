@@ -20,9 +20,43 @@
       />
     </n-layout-sider>
     <n-layout style="height: 100%">
+      <n-layout-header bordered class="app-header">
+        <div class="app-header__inner">
+          <div class="app-header__title">iat</div>
+        </div>
+      </n-layout-header>
       <n-layout-content :content-style="contentStyle">
         <router-view />
       </n-layout-content>
+      <n-layout-footer bordered class="app-footer">
+        <div class="app-footer__inner">
+          <div class="app-footer__left">© iat Engine</div>
+          <div class="app-footer__right">
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button
+                  quaternary
+                  circle
+                  size="small"
+                  @click="showScriptDocs = !showScriptDocs"
+                >
+                  <n-icon size="18">
+                    <CodeIcon />
+                  </n-icon>
+                </n-button>
+              </template>
+              脚本 API 文档
+            </n-tooltip>
+
+            <div class="engine-status" title="Engine 状态">
+              <span class="engine-status__dot" :class="engineStatusDotClass" />
+              <span class="engine-status__text"
+                >Engine: {{ engineStatusLabel }}</span
+              >
+            </div>
+          </div>
+        </div>
+      </n-layout-footer>
     </n-layout>
 
     <!-- Floating Script Docs Window -->
@@ -46,11 +80,20 @@ import {
   ServerOutline as MCPIcon,
 } from "@vicons/ionicons5";
 import ScriptDocsFloat from "../components/ScriptDocsFloat.vue";
+import { useEngineStatus } from "../useEngineStatus";
 
 const collapsed = ref(false);
 const showScriptDocs = ref(false);
 const route = useRoute();
 const router = useRouter();
+const { engineStatus, engineStatusLabel } = useEngineStatus();
+
+const engineStatusDotClass = computed(() => {
+  if (engineStatus.value === "Online") return "engine-status__dot--online";
+  if (engineStatus.value === "Offline") return "engine-status__dot--offline";
+  if (engineStatus.value === "Error") return "engine-status__dot--error";
+  return "engine-status__dot--checking";
+});
 
 const activeKey = computed(() => {
   // If showing docs and not on a specific route that matches, maybe we don't highlight?
@@ -117,14 +160,6 @@ const menuOptions = [
     icon: renderIcon(ChatIcon),
     onClick: () => router.push({ name: "Chat" }),
   },
-  {
-    label: "脚本API文档",
-    key: "ScriptDocs",
-    icon: renderIcon(CodeIcon),
-    onClick: () => {
-      showScriptDocs.value = !showScriptDocs.value;
-    },
-  },
 ];
 
 function handleUpdateValue(key) {
@@ -134,5 +169,76 @@ function handleUpdateValue(key) {
 <style scoped>
 :deep(.n-layout) {
   height: 100%;
+}
+
+.app-header {
+  height: 48px;
+}
+
+.app-header__inner {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.app-header__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.app-footer {
+  height: 44px;
+}
+
+.app-footer__inner {
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-footer__left {
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+.app-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.engine-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  opacity: 0.9;
+  user-select: none;
+}
+
+.engine-status__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.engine-status__dot--online {
+  background: #18a058;
+}
+
+.engine-status__dot--offline {
+  background: #d03050;
+}
+
+.engine-status__dot--error {
+  background: #f0a020;
+}
+
+.engine-status__dot--checking {
+  background: #909399;
 }
 </style>

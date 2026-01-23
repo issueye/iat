@@ -20,9 +20,31 @@
       />
     </n-layout-sider>
     <n-layout style="height: 100%">
+      <n-layout-header bordered class="app-header">
+        <div class="app-header__inner">
+          <div class="app-header__title">iat</div>
+        </div>
+      </n-layout-header>
       <n-layout-content :content-style="contentStyle">
         <router-view />
       </n-layout-content>
+      <n-layout-footer bordered class="app-footer">
+        <div class="app-footer__inner">
+          <div class="app-footer__left">© iat Engine</div>
+          <div class="app-footer__right">
+            <n-tooltip trigger="hover">
+              <template #trigger>
+                <n-button quaternary circle size="small" @click="showScriptDocs = !showScriptDocs">
+                  <n-icon size="18">
+                    <CodeIcon />
+                  </n-icon>
+                </n-button>
+              </template>
+              脚本 API 文档
+            </n-tooltip>
+          </div>
+        </div>
+      </n-layout-footer>
     </n-layout>
 
     <!-- Floating Script Docs Window -->
@@ -117,14 +139,6 @@ const menuOptions = [
     icon: renderIcon(ChatIcon),
     onClick: () => router.push({ name: "Chat" }),
   },
-  {
-    label: "脚本API文档",
-    key: "ScriptDocs",
-    icon: renderIcon(CodeIcon),
-    onClick: () => {
-      showScriptDocs.value = !showScriptDocs.value;
-    },
-  },
 ];
 
 function handleUpdateValue(key) {
@@ -134,5 +148,45 @@ function handleUpdateValue(key) {
 <style scoped>
 :deep(.n-layout) {
   height: 100%;
+}
+
+.app-header {
+  height: 48px;
+}
+
+.app-header__inner {
+  height: 48px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+}
+
+.app-header__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.app-footer {
+  height: 44px;
+}
+
+.app-footer__inner {
+  height: 44px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-footer__left {
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+.app-footer__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 </style>
