@@ -18,6 +18,7 @@ import {
   BanOutline,
   ChevronDownOutline,
 } from "@vicons/ionicons5";
+import Thinking from "./Thinking.vue";
 
 interface SubAgentTask {
   taskId: string;
@@ -31,9 +32,63 @@ interface SubAgentTask {
   children: SubAgentTask[];
 }
 
+const ThinkTags = {
+  Open: "<think>",
+  Close: "</think>",
+};
+
 const props = defineProps<SubAgentTask>();
 
 const emit = defineEmits(["abort"]);
+
+function parseThinkContent(text: string) {
+  const raw = String(text || "");
+  const thinkOpenTag = ThinkTags.Open;
+  const thinkCloseTag = ThinkTags.Close;
+  let i = 0;
+  let inThink = false;
+  let answer = "";
+  let think = "";
+
+  while (i < raw.length) {
+    const openAt = raw.indexOf(thinkOpenTag, i);
+    const closeAt = raw.indexOf(thinkCloseTag, i);
+
+    const nextAt =
+      openAt === -1
+        ? closeAt
+        : closeAt === -1
+          ? openAt
+          : Math.min(openAt, closeAt);
+
+    if (nextAt === -1) {
+      const chunk = raw.slice(i);
+      if (inThink) think += chunk;
+      else answer += chunk;
+      break;
+    }
+
+    const chunk = raw.slice(i, nextAt);
+    if (inThink) think += chunk;
+    else answer += chunk;
+
+    if (nextAt === openAt) {
+      inThink = true;
+      i = nextAt + thinkOpenTag.length;
+    } else {
+      inThink = false;
+      i = nextAt + thinkCloseTag.length;
+    }
+  }
+
+  return {
+    think: think.trim(),
+    answer: answer.trim(),
+    isThinkingOpen: inThink,
+  };
+}
+
+const parsedStream = computed(() => parseThinkContent(props.chunks.join("")));
 
 const statusColor = computed(() => {
   switch (props.status) {
@@ -145,10 +200,26 @@ const handleAbort = () => {
           </template>
           <div class="thought-content">
             <Thinking
-              v-if="fullThought || status === 'running'"
-              :content="fullThought"
+              v-if="parsedStream.think || parsedStream.isThinkingOpen"
+              :content="parsedStream.think"
             />
-            <div v-else class="empty-text">暂无思考过程</div>
+            <div
+              v-if="parsedStream.answer"
+              class="stream-answer"
+              style="margin-top: 8px"
+            >
+              <XMarkdown :markdown="parsedStream.answer" />
+            </div>
+            <div
+              v-if="
+                !parsedStream.think &&
+                !parsedStream.isThinkingOpen &&
+                !parsedStream.answer
+              "
+              class="empty-text"
+            >
+              暂无处理过程
+            </div>
           </div>
         </n-collapse-item>
 

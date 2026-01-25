@@ -274,6 +274,7 @@ import {
 } from "@vicons/ionicons5";
 import { api } from "../api";
 import SubAgentCard from "../components/SubAgentCard.vue";
+import Thinking from "../components/Thinking.vue";
 import {
   ChatModes,
   ChatRoles,
@@ -619,17 +620,22 @@ async function handleSend(val) {
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
+    let buffer = "";
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
-      const chunk = decoder.decode(value);
-      const lines = chunk.split("\n\n");
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split("\n\n");
+      buffer = parts.pop() || "";
 
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const dataStr = line.slice(6);
+      for (const line of parts) {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        if (trimmedLine.startsWith("data: ")) {
+          const dataStr = trimmedLine.slice(6);
           try {
             const data = JSON.parse(dataStr);
             handleSSEEvent(data, aiMsgIndex);
@@ -792,6 +798,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   padding: 10px;
+  width: calc(100% - 260px);
 }
 
 .chat-header-bar {
