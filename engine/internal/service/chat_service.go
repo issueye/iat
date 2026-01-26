@@ -682,6 +682,56 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		return fmt.Errorf("session not found: %v", err)
 	}
 
+	// [New] Auto-generate session title if empty
+	if session.Name == "" || session.Name == "New Session" || session.Name == "新会话" {
+		go func() {
+			// Generate title using AI
+			// We use a small timeout for title generation
+			genCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			titlePrompt := []*schema.Message{
+				{
+					Role:    schema.System,
+					Content: "你是一个会话标题生成器。请根据用户的输入内容，生成一个极简、直观的标题（不超过15个字）。只输出标题内容，不要有任何解释、标点或前缀。",
+				},
+				{
+					Role:    schema.User,
+					Content: userMessage,
+				},
+			}
+
+			// Get default model for title generation
+			modelConfig, err := s.modelRepo.GetDefault()
+			if err == nil && modelConfig != nil {
+				aiClient, cerr := ai.NewAIClient(modelConfig, nil)
+				if cerr == nil {
+					resp, serr := aiClient.Chat(genCtx, titlePrompt)
+					if serr == nil && resp.Content != "" {
+						newTitle := strings.TrimSpace(resp.Content)
+						newTitle = strings.Trim(newTitle, "\"\"''") // Remove quotes if any
+						if newTitle != "" {
+							session.Name = newTitle
+							s.sessionRepo.Update(session)
+							// Notify frontend via WS
+							if s.wsHub != nil {
+								s.wsHub.Broadcast(protocol.Message{
+									Type:   protocol.MsgNotification,
+									Action: "session_updated",
+									Payload: map[string]any{
+										"sessionId": session.ID,
+										"name":      newTitle,
+									},
+									Timestamp: time.Now().UnixMilli(),
+								})
+							}
+						}
+					}
+				}
+			}
+		}()
+	}
+
 	projectRoot := ""
 	var project *model.Project
 	if session.ProjectID != 0 {

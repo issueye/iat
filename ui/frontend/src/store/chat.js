@@ -29,6 +29,15 @@ export const useChatStore = defineStore('chat', {
         // Handle global real-time updates
         console.log('Global WS Msg:', msg)
         debugStore.addLog(msg.action || msg.type, msg.payload || msg)
+
+        // Handle session updates
+        if (msg.action === 'session_updated') {
+          const { sessionId, name } = msg.payload
+          const session = this.sessions.find(s => s.id === sessionId)
+          if (session) {
+            session.name = name
+          }
+        }
       })
     },
     async fetchSessions(projectId) {

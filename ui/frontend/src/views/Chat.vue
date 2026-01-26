@@ -44,10 +44,24 @@
           :class="{ active: currentSessionId === session.id }"
           @click="currentSessionId = session.id"
         >
-          <div class="session-name">{{ session.name }}</div>
-          <div class="session-time">
-            {{ new Date(session.createdAt).toLocaleString() }}
+          <div class="session-info">
+            <div class="session-name">{{ session.name }}</div>
+            <div class="session-time">
+              {{ new Date(session.createdAt).toLocaleString() }}
+            </div>
           </div>
+          <n-button
+            v-if="currentSessionId === session.id"
+            size="tiny"
+            quaternary
+            circle
+            class="delete-session-btn"
+            @click.stop="handleDeleteSession(session)"
+          >
+            <template #icon>
+              <n-icon><TrashOutline /></n-icon>
+            </template>
+          </n-button>
         </div>
         <div v-if="displaySessions.length === 0" class="empty-sessions">
           无会话
@@ -112,6 +126,7 @@
           :loading="isGenerating"
           class="messages-area"
           :bubble-props="{ showTime: true }"
+          :auto-scroll="messages.length >= 2"
         >
           <template #avatar="{ item }">
             <n-avatar
@@ -160,14 +175,13 @@
       negative-text="取消"
       @positive-click="
         async () => {
-          if (!newSessionName) return;
           try {
             await api.createSession(
-              newSessionName,
+              newSessionName || '',
               currentProjectId,
               currentChatAgentId || 0,
             );
-            await loadSessions(currentProjectId);
+            await chatStore.fetchSessions(currentProjectId);
             showCreateModal = false;
             newSessionName = '';
           } catch (e) {
@@ -178,7 +192,7 @@
     >
       <n-input
         v-model:value="newSessionName"
-        placeholder="会话名称"
+        placeholder="会话名称 (可选，留空由 AI 生成)"
         autofocus
       />
     </n-modal>
@@ -263,11 +277,51 @@ const currentWorkflowTasks = computed(() => workflowStore.tasks);
 // Sub-Agent Tasks State
 const subAgentTaskMap = ref(new Map());
 
-const modeOptions = [
-  { label: "对话 (Chat)", value: ChatModes.Chat },
-  { label: "计划 (Plan)", value: ChatModes.Plan },
-  { label: "构建 (Build)", value: ChatModes.Build },
-];
+const modeOptions = computed(() => {
+  return agentStore.modes.map((m) => ({
+    label: `${m.name} (${m.key})`,
+    value: m.key,
+    id: m.id,
+  }));
+});
+
+// Filter agents by selected mode
+const agentOptions = computed(() => {
+  const mode = agentStore.modes.find((m) => m.key === currentChatMode.value);
+  if (!mode) return [];
+
+  return agents.value
+    .filter((a) => a.modeId === mode.id)
+    .map((a) => ({
+      label: a.name,
+      value: a.id,
+    }));
+});
+
+// Watch mode change to auto-select first available agent
+watch(currentChatMode, (newMode) => {
+  const filtered = agentOptions.value;
+  if (filtered.length > 0) {
+    // If current agent not in filtered list, pick first one
+    if (!filtered.find((a) => a.value === currentChatAgentId.value)) {
+      currentChatAgentId.value = filtered[0].value;
+    }
+  } else {
+    currentChatAgentId.value = null;
+  }
+});
+
+// Watch agent change to sync mode
+watch(currentChatAgentId, (newAgentId) => {
+  if (!newAgentId) return;
+  const agent = agents.value.find((a) => a.id === newAgentId);
+  if (agent && agent.modeId) {
+    const mode = agentStore.modes.find((m) => m.id === agent.modeId);
+    if (mode && mode.key !== currentChatMode.value) {
+      currentChatMode.value = mode.key;
+    }
+  }
+});
 
 // UI State
 const showCreateModal = ref(false);
@@ -279,13 +333,6 @@ const projectOptions = computed(() => {
   return projects.value.map((p) => ({
     label: p.name,
     value: p.id,
-  }));
-});
-
-const agentOptions = computed(() => {
-  return agents.value.map((a) => ({
-    label: a.name,
-    value: a.id,
   }));
 });
 
@@ -344,6 +391,28 @@ async function handleStop() {
   }
 }
 
+async function handleDeleteSession(session) {
+  dialog.warning({
+    title: "删除会话",
+    content: `确定要删除会话 "${session.name}" 吗？此操作无法撤销。`,
+    positiveText: "删除",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      try {
+        await api.deleteSession(session.id);
+        message.success("会话已删除");
+        if (currentSessionId.value === session.id) {
+          currentSessionId.value = null;
+          chatStore.messages = [];
+        }
+        await chatStore.fetchSessions(currentProjectId.value);
+      } catch (e) {
+        message.error("删除失败: " + e.message);
+      }
+    },
+  });
+}
+
 // Chat Logic
 async function handleSend(val) {
   const content = typeof val === "string" ? val : inputText.value;
@@ -354,6 +423,22 @@ async function handleSend(val) {
   if (!currentChatAgentId.value) {
     message.error("请先选择一个智能体");
     return;
+  }
+
+  // Auto-create session if not selected
+  if (!currentSessionId.value) {
+    try {
+      const sess = await api.createSession(
+        "", // Empty name
+        currentProjectId.value,
+        currentChatAgentId.value,
+      );
+      await chatStore.fetchSessions(currentProjectId.value);
+      currentSessionId.value = sess.id;
+    } catch (e) {
+      message.error("创建会话失败: " + e.message);
+      return;
+    }
   }
 
   chatStore.input = "";
@@ -534,6 +619,8 @@ onMounted(() => {
 
 :deep(.el-bubble-content-wrapper .el-bubble-content-filled) {
   padding: 0px;
+  width: 100%;
+  --bubble-content-max-width: calc(100% - 230px);
 }
 
 .chat-container {
@@ -592,8 +679,29 @@ onMounted(() => {
 }
 
 .session-item.active {
-  background-color: var(--color-light);
-  border-color: var(--color-info);
+  background-color: #e7f5ff;
+  border-color: #a5d8ff;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.session-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.delete-session-btn {
+  opacity: 0;
+  transition: opacity 0.2s;
+  margin-left: 8px;
+}
+
+.session-item:hover .delete-session-btn {
+  opacity: 1;
 }
 
 .session-name {
@@ -655,7 +763,7 @@ onMounted(() => {
 
 .messages-area {
   flex: 1;
-  padding: 24px;
+  padding: var(--base-padding);
   overflow-y: auto;
 }
 

@@ -36,10 +36,8 @@ const collapsed = ref(false);
 
 <style scoped>
 .thinking-block {
-  margin: 12px 0;
-  border-radius: 8px;
-  background-color: #f8f9fa;
-  border: 1px solid #e9ecef;
+  margin: var(--base-gap-sm);
+  border-radius: var(--base-radius);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -48,6 +46,7 @@ const collapsed = ref(false);
 }
 
 .thinking-header {
+  width: 120px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -55,6 +54,8 @@ const collapsed = ref(false);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
+  border: 1px solid #e9ecef;
+  background-color: #f8f9fa;
 }
 
 .thinking-header:hover {
@@ -89,6 +90,8 @@ const collapsed = ref(false);
   padding: 0 16px 12px;
   max-height: 400px;
   overflow-y: auto;
+  border: 1px solid #e9ecef;
+  background-color: #f8f9fa;
 }
 
 .thinking-text {
@@ -97,8 +100,8 @@ const collapsed = ref(false);
   color: #6c757d;
   line-height: 1.6;
   font-family: "Fira Code", "JetBrains Mono", monospace;
-  border-left: 2px solid #dee2e6;
   padding-left: 12px;
+  margin-top: var(--base-gap);
 }
 
 .thinking-placeholder {
