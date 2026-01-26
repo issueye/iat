@@ -121,7 +121,6 @@ function getTasksByMessage(msg) {
   background-color: var(--color-grey-light);
   border-radius: var(--shiki-custom-brr);
   padding: var(--base-padding-sm) var(--base-padding-md);
-  border-left: 4px solid var(--color-primary);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 

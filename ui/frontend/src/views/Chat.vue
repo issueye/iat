@@ -620,7 +620,7 @@ onMounted(() => {
 :deep(.el-bubble-content-wrapper .el-bubble-content-filled) {
   padding: 0px;
   width: 100%;
-  --bubble-content-max-width: calc(100% - 230px);
+  max-width: 90% !important;
 }
 
 .chat-container {
@@ -636,6 +636,7 @@ onMounted(() => {
   background-color: var(--color-light);
   border-right: 1px solid var(--color-grey-light);
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   transition: all 0.3s;
   box-shadow: 2px 0 8px rgba(0, 0, 0, 0.02);
@@ -728,16 +729,15 @@ onMounted(() => {
 
 /* Main Content Styling */
 .chat-main {
-  flex: 1;
+  flex: calc(100% - var(--sidebar-width));
   display: flex;
   flex-direction: column;
   background-color: #ffffff;
-  position: relative;
 }
 
 .chat-header-bar {
-  height: 60px;
-  padding: 0 24px;
+  padding: var(--base-padding);
+  width: calc(100% - 27px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -754,11 +754,10 @@ onMounted(() => {
 }
 
 .chat-main-content {
-  flex: 1;
+  width: calc(100% - 1px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  position: relative;
 }
 
 .messages-area {
@@ -768,7 +767,7 @@ onMounted(() => {
 }
 
 .input-area {
-  padding: 20px 24px 30px;
+  padding: var(--base-padding);
   background: linear-gradient(to top, #ffffff 80%, rgba(255, 255, 255, 0));
 }
 

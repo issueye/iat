@@ -19,7 +19,7 @@
         @update:value="handleUpdateValue"
       />
     </n-layout-sider>
-    <n-layout style="height: 100%">
+    <n-layout :style="{ height: '100%', width: mainWidth }">
       <n-layout-header bordered class="app-header">
         <div class="app-header__inner">
           <div class="app-header__left">
@@ -118,6 +118,10 @@ const routeTitleMap = {
   Modes: "模式管理",
   Chat: "智能对话",
 };
+
+const mainWidth = computed(() => {
+  return collapsed.value ? "calc(100% - 64px)" : "calc(100% - 200px)";
+});
 
 const breadcrumbItems = computed(() => {
   return route.matched

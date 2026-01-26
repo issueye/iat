@@ -50,12 +50,13 @@ const collapsed = ref(false);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: var(--base-padding-sm);
+  border-radius: var(--base-radius);
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
-  border: 1px solid #e9ecef;
-  background-color: #f8f9fa;
+  border: 1px solid var(--color-grey-light);
+  background-color: var(--color-grey-light);
 }
 
 .thinking-header:hover {
