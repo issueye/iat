@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { getSessions, getMessages, deleteMessages } from '@/api'
 import { WSClient } from '@/utils/websocket'
 import { useDebugStore } from './debug'
+import { useWorkflowStore } from './workflow'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -20,6 +21,7 @@ export const useChatStore = defineStore('chat', {
     initWS() {
       if (this.ws) return
       const debugStore = useDebugStore()
+      const workflowStore = useWorkflowStore()
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const host = window.location.host || 'localhost:8080'
       this.ws = new WSClient(`${protocol}//${host}/api/ws`)
@@ -37,6 +39,12 @@ export const useChatStore = defineStore('chat', {
           if (session) {
             session.name = name
           }
+        }
+
+        // Handle task status updates
+        if (msg.action === 'task_status') {
+          const { taskId, status, output } = msg.payload || {}
+          workflowStore.updateTaskStatus(taskId, status, output)
         }
       })
     },
