@@ -5,6 +5,7 @@ import (
 	"iat/common/model"
 	"iat/common/pkg/consts"
 	"iat/common/pkg/tools"
+	"strings"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
@@ -223,7 +224,8 @@ func GetEinoTools(mode string) []*schema.ToolInfo {
 		}`),
 	})
 
-	if mode == "build" {
+	// 仅在构建模式下添加写文件工具
+	if strings.ToUpper(mode) == consts.BuildMode {
 		// Write File
 		infos = append(infos, &schema.ToolInfo{
 			Name: "write_file",

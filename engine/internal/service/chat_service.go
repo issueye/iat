@@ -14,6 +14,7 @@ import (
 	"iat/engine/pkg/ai"
 	"iat/engine/pkg/tools/builtin"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -779,16 +780,19 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		effectiveMode = modeKey
 	}
 
-	if effectiveMode == "chat" {
+	slog.Info("当前模式", slog.String("模式", effectiveMode))
+
+	switch strings.ToUpper(effectiveMode) {
+	case consts.ChatMode:
 		// Chat agent should not execute tools
 		// We can clear tools if they are somehow attached
 		agent.Tools = nil
-	} else if effectiveMode == "plan" {
+	case consts.PlanMode:
 		// Plan agent: Ensure system prompt includes instructions to only operate in 'plan' directory
 		// And maybe we can enforce it in tool implementation (but that requires context awareness in tool)
 		// For now, let's append a strict instruction to system prompt
 		agent.SystemPrompt += consts.SystemPromptPlanRestriction
-	} else if effectiveMode == "build" {
+	case consts.BuildMode:
 		// Build agent has all permissions.
 	}
 
@@ -808,7 +812,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 	}
 
 	// 4. Prepare Tools
-	// Get Builtin Tools
+	// 获取当前模式下的工具
 	einoTools := builtin.GetEinoTools(effectiveMode)
 
 	// Get MCP Tools bound to Agent
@@ -845,22 +849,12 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			})
 		}
 	}
-	// However, if we want to support custom tools (scripts), we should add them here.
-	// Let's iterate agent.Tools and convert them to schema.ToolInfo if they are 'custom' type.
 
-	for _, t := range agent.Tools {
-		if t.Type == "custom" {
-			var s jsonschema.Schema
-			if err := json.Unmarshal([]byte(t.Parameters), &s); err != nil {
-				fmt.Printf("Failed to parse schema for custom tool %s: %v\n", t.Name, err)
-				continue
-			}
-			einoTools = append(einoTools, &schema.ToolInfo{
-				Name:        t.Name,
-				Desc:        t.Description,
-				ParamsOneOf: schema.NewParamsOneOfByJSONSchema(&s),
-			})
-		}
+	// [Fix] DeepSeek R1 (reasoner) does not support Tools yet.
+	// If the model is a reasoner model, we MUST NOT send tools, otherwise API returns 400.
+	if modelConfig != nil && (strings.Contains(strings.ToLower(modelConfig.Name), "reasoner") || strings.Contains(strings.ToLower(modelConfig.Name), "deepseek-r1")) {
+		fmt.Printf("[ChatService] Detected Reasoner model '%s', disabling tools to prevent API error.\n", modelConfig.Name)
+		einoTools = nil
 	}
 
 	// 5. Init AI Client
@@ -991,6 +985,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 		stream, err := aiClient.StreamChat(ctx, messages)
 		if err != nil {
+			slog.Error("调用AI模型失败", slog.Any("失败原因", err.Error()))
 			s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventError, Content: err.Error()}, eventChan)
 			return nil
 		}

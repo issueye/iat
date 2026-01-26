@@ -6,9 +6,9 @@ export const ChatRoles = {
 };
 
 export const ChatModes = {
-  Chat: "chat",
-  Plan: "plan",
-  Build: "build",
+  Chat: "CHAT",
+  Plan: "PLAN",
+  Build: "BUILD",
 };
 
 export const ToolStages = {
