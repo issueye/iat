@@ -40,7 +40,10 @@ import SubAgentCard from "@/components/SubAgentCard.vue";
 import Thinking from "@/components/Thinking.vue";
 import { ContractOutline } from "@vicons/ionicons5";
 import { ThinkTags } from "@/constants/chat";
+import { api } from "@/api";
+import { useMessage } from "naive-ui";
 
+const message = useMessage();
 const props = defineProps({
   item: {
     type: Object,
@@ -110,6 +113,15 @@ function getTasksByMessage(msg) {
   return Array.from(props.taskMap.values()).filter(
     (t) => t.messageIndex === idx && !t.parentTaskId,
   );
+}
+
+async function handleAbortSubAgent(taskId) {
+  try {
+    await api.abortSubAgentTask(taskId);
+    message.success("子任务中止请求已发送");
+  } catch (e) {
+    message.error("中止失败: " + e.message);
+  }
 }
 </script>
 <style scoped>

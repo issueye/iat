@@ -44,6 +44,18 @@
         </n-form-item>
         <n-form-item
           v-if="formValue.type !== 'external'"
+          label="关联模式"
+          path="modeId"
+        >
+          <n-select
+            v-model:value="formValue.modeId"
+            :options="modeOptions"
+            placeholder="选择关联模式"
+            clearable
+          />
+        </n-form-item>
+        <n-form-item
+          v-if="formValue.type !== 'external'"
           label="模型"
           path="modelId"
         >
@@ -147,6 +159,7 @@ import {
   ListAIModels,
   ListTools,
   ListMCPServers,
+  ListModes,
 } from "../../wailsjs/go/main/App";
 
 const message = useMessage();
@@ -156,6 +169,7 @@ const agents = ref([]);
 const modelOptions = ref([]);
 const toolOptions = ref([]);
 const mcpOptions = ref([]);
+const modeOptions = ref([]);
 const loading = ref(false);
 const showCreateModal = ref(false);
 const submitting = ref(false);
@@ -168,6 +182,7 @@ const formValue = ref({
   systemPrompt: "",
   type: "custom",
   modelId: null,
+  modeId: null,
   toolIds: [],
   mcpServerIds: [],
   externalUrl: "",
@@ -349,6 +364,15 @@ async function loadData() {
       }));
     }
 
+    // Load Modes
+    const modeRes = await ListModes();
+    if (modeRes.code === 200) {
+      modeOptions.value = (modeRes.data || []).map((m) => ({
+        label: `${m.name} (${m.key})`,
+        value: m.id,
+      }));
+    }
+
     // Load Agents
     const res = await ListAgents();
     if (res.code === 200) {
@@ -372,6 +396,7 @@ function handleEdit(row) {
     systemPrompt: row.systemPrompt,
     type: row.type || "custom",
     modelId: row.modelId,
+    modeId: row.modeId,
     toolIds: (row.tools || []).map((t) => t.id),
     mcpServerIds: (row.mcpServers || []).map((m) => m.id),
     externalUrl: row.externalUrl || "",
@@ -411,6 +436,7 @@ function closeModal() {
     systemPrompt: "",
     type: "custom",
     modelId: null,
+    modeId: null,
     toolIds: [],
     mcpServerIds: [],
     externalUrl: "",
@@ -432,6 +458,7 @@ async function handleSubmit() {
     let res;
     const modelId = formValue.value.modelId || 0;
     const type = formValue.value.type || "custom";
+    const modeId = formValue.value.modeId || 1;
 
     if (isEdit.value) {
       res = await UpdateAgent(
@@ -446,7 +473,7 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        1, // Default ModeID for now
+        modeId,
         formValue.value.status || "offline",
         formValue.value.capabilities || "",
       );
@@ -462,7 +489,7 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        1,
+        modeId,
         formValue.value.status || "offline",
         formValue.value.capabilities || "",
       );

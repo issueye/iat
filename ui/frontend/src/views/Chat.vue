@@ -3,12 +3,20 @@
     <!-- Left Sidebar: Sessions -->
     <div class="chat-sidebar">
       <div class="sidebar-header">
-        <n-select
-          v-model:value="currentProjectId"
-          :options="projectOptions"
-          placeholder="选择项目"
-          size="small"
-        />
+        <div style="display: flex; gap: 8px">
+          <n-select
+            v-model:value="currentProjectId"
+            :options="projectOptions"
+            placeholder="选择项目"
+            size="small"
+            style="flex: 1"
+          />
+          <n-button size="small" @click="refreshProjects">
+            <template #icon>
+              <n-icon><RefreshOutline /></n-icon>
+            </template>
+          </n-button>
+        </div>
         <n-button
           block
           dashed
@@ -219,6 +227,7 @@ import {
   TrashOutline,
   InformationCircleOutline,
   StopCircleOutline,
+  RefreshOutline,
 } from "@vicons/ionicons5";
 import { api } from "../api";
 import { useAgentStore } from "../store/agent";
@@ -361,6 +370,15 @@ watch(currentSessionId, async (newVal) => {
 });
 
 // Methods
+async function refreshProjects() {
+  try {
+    await projectStore.fetchProjects();
+    message.success("项目列表已刷新");
+  } catch (e) {
+    message.error("刷新项目失败: " + e.message);
+  }
+}
+
 async function handleClear() {
   if (!currentSessionId.value) return;
   dialog.warning({

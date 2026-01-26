@@ -20,12 +20,30 @@ import {
 } from "@vicons/ionicons5";
 import Thinking from "./Thinking.vue";
 
+import XMarkdown from "./renderers/XMarkdown.vue";
+
 const ThinkTags = {
   Open: "<think>",
   Close: "</think>",
 };
 
-const props = defineProps();
+const props = defineProps({
+  taskId: String,
+  agentName: String,
+  query: String,
+  status: String,
+  depth: Number,
+  result: String,
+  error: String,
+  chunks: {
+    type: Array,
+    default: () => [],
+  },
+  children: {
+    type: Array,
+    default: () => [],
+  },
+});
 
 const emit = defineEmits(["abort"]);
 
@@ -76,7 +94,10 @@ function parseThinkContent(text) {
   };
 }
 
-const parsedStream = computed(() => parseThinkContent(props.chunks.join("")));
+const parsedStream = computed(() => {
+  const chunks = props.chunks || [];
+  return parseThinkContent(chunks.join(""));
+});
 
 const statusColor = computed(() => {
   switch (props.status) {
@@ -129,7 +150,10 @@ const statusLabel = computed(() => {
   }
 });
 
-const fullThought = computed(() => props.chunks.join(""));
+const fullThought = computed(() => {
+  const chunks = props.chunks || [];
+  return chunks.join("");
+});
 
 const handleAbort = () => {
   emit("abort", props.taskId);
