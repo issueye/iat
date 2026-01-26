@@ -620,7 +620,6 @@ onMounted(() => {
 :deep(.el-bubble-content-wrapper .el-bubble-content-filled) {
   padding: 0px;
   width: 100%;
-  max-width: 90% !important;
 }
 
 .chat-container {
@@ -755,6 +754,7 @@ onMounted(() => {
 
 .chat-main-content {
   width: calc(100% - 1px);
+  height: calc(100% - 45px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
