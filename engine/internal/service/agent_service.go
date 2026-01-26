@@ -16,7 +16,7 @@ func NewAgentService() *AgentService {
 	}
 }
 
-func (s *AgentService) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
+func (s *AgentService) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) error {
 	var tools []model.Tool
 	for _, tid := range toolIDs {
 		tools = append(tools, model.Tool{Base: model.Base{ID: tid}})
@@ -32,22 +32,24 @@ func (s *AgentService) CreateAgent(name, description, systemPrompt, agentType, e
 	}
 
 	agent := &model.Agent{
-		Name:         name,
-		Description:  description,
-		SystemPrompt: systemPrompt,
-		Type:         agentType,
-		ModelID:      modelID,
-		Tools:        tools,
-		MCPServers:   mcpServers,
-		ModeID:       modeID,
-		ExternalURL:  externalURL,
-		ExternalType: externalType,
+		Name:           name,
+		Description:    description,
+		SystemPrompt:   systemPrompt,
+		Type:           agentType,
+		ModelID:        modelID,
+		Tools:          tools,
+		MCPServers:     mcpServers,
+		ModeID:         modeID,
+		ExternalURL:    externalURL,
+		ExternalType:   externalType,
 		ExternalParams: externalParams,
+		Status:         status,
+		Capabilities:   capabilities,
 	}
 	return s.repo.Create(agent)
 }
 
-func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) error {
+func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) error {
 	agent, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
@@ -77,6 +79,13 @@ func (s *AgentService) UpdateAgent(id uint, name, description, systemPrompt, age
 	agent.ExternalURL = externalURL
 	agent.ExternalType = externalType
 	agent.ExternalParams = externalParams
+	
+	if status != "" {
+		agent.Status = status
+	}
+	if capabilities != "" {
+		agent.Capabilities = capabilities
+	}
 	
 	return s.repo.Update(agent)
 }

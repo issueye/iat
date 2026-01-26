@@ -9,15 +9,16 @@ import (
 	"iat/common/model"
 	"iat/common/pkg/chat"
 	"iat/common/pkg/consts"
+	"iat/common/protocol"
 	"iat/engine/internal/repo"
 	"iat/engine/pkg/ai"
 	"iat/engine/pkg/tools/builtin"
-	"iat/engine/pkg/tools/script"
 	"io"
 	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/cloudwego/eino/schema"
 	"github.com/eino-contrib/jsonschema"
@@ -48,6 +49,14 @@ type sessionCancel struct {
 	cancel context.CancelFunc
 }
 
+type TaskPlanner interface {
+	Plan(ctx context.Context, goal string) (*model.TaskTree, error)
+}
+
+type WorkflowExecutor interface {
+	ExecuteWorkflow(ctx context.Context, workflow *model.Workflow, tasks []model.WorkflowTask) error
+}
+
 type ChatService struct {
 	projectRepo         *repo.ProjectRepo
 	sessionRepo         *repo.SessionRepo
@@ -56,14 +65,18 @@ type ChatService struct {
 	messageRepo         *repo.MessageRepo
 	toolRepo            *repo.ToolInvocationRepo
 	mcpService          *MCPService
+	toolService         *ToolService
 	taskService         *TaskService
 	subAgentTaskService *SubAgentTaskService
+	wsHub               *WSHub
+	executor            WorkflowExecutor
+	plannerFactory      func(client *ai.AIClient) TaskPlanner
 	mu                  sync.Mutex
 	genCounter          uint64
 	cancelBySID         map[uint]sessionCancel
 }
 
-func NewChatService(mcpService *MCPService, taskService *TaskService, subAgentTaskService *SubAgentTaskService) *ChatService {
+func NewChatService(mcpService *MCPService, toolService *ToolService, taskService *TaskService, subAgentTaskService *SubAgentTaskService, wsHub *WSHub) *ChatService {
 	return &ChatService{
 		projectRepo:         repo.NewProjectRepo(),
 		sessionRepo:         repo.NewSessionRepo(),
@@ -72,8 +85,10 @@ func NewChatService(mcpService *MCPService, taskService *TaskService, subAgentTa
 		messageRepo:         repo.NewMessageRepo(),
 		toolRepo:            repo.NewToolInvocationRepo(),
 		mcpService:          mcpService,
+		toolService:         toolService,
 		taskService:         taskService,
 		subAgentTaskService: subAgentTaskService,
+		wsHub:               wsHub,
 		cancelBySID:         make(map[uint]sessionCancel),
 	}
 }
@@ -99,9 +114,30 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 	return nil
 }
 
+func (s *ChatService) emitEvent(sessionID uint, event chat.ChatEvent, eventChan chan<- chat.ChatEvent) {
+	if eventChan != nil {
+		eventChan <- event
+	} else if s.wsHub != nil {
+		s.wsHub.Broadcast(protocol.Message{
+			Type:      protocol.MsgNotification,
+			Action:    string(event.Type),
+			Payload:   event.Extra,
+			Timestamp: time.Now().UnixMilli(),
+		})
+	}
+}
+
 // RunAgentInternal runs an agent synchronously for internal calls (like sub-agents)
 // depth: current recursion depth, starts at 0 for root calls
-func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, projectRoot string, modeKey string, depth int, parentTaskID string, eventChan chan<- chat.ChatEvent) (string, error) {
+func (s *ChatService) SetExecutor(executor WorkflowExecutor) {
+	s.executor = executor
+}
+
+func (s *ChatService) SetPlannerFactory(factory func(client *ai.AIClient) TaskPlanner) {
+	s.plannerFactory = factory
+}
+
+func (s *ChatService) RunAgentInternal(sessionID uint, agentName string, userMessage string, projectRoot string, mode string, depth int, parentTaskID string, eventChan chan<- chat.ChatEvent) (string, error) {
 	// Check recursion depth
 	if depth > SubAgentMaxDepth {
 		return "", fmt.Errorf("sub-agent recursion depth exceeded (max: %d, current: %d)", SubAgentMaxDepth, depth)
@@ -111,7 +147,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	var subTask *model.SubAgentTask
 	if s.subAgentTaskService != nil {
 		var err error
-		subTask, err = s.subAgentTaskService.CreateTask(sessionID, agentName, query, parentTaskID, depth, eventChan)
+		subTask, err = s.subAgentTaskService.CreateTask(sessionID, agentName, userMessage, parentTaskID, depth, eventChan)
 		if err != nil {
 			return "", fmt.Errorf("failed to create sub-agent task: %v", err)
 		}
@@ -140,8 +176,11 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 
 	// Permission Check
 	effectiveMode := targetAgent.Mode.Key
-	if modeKey != "" {
-		effectiveMode = targetAgent.Mode.Key
+	if effectiveMode == "" {
+		effectiveMode = "chat"
+	}
+	if mode != "" {
+		effectiveMode = mode
 	}
 
 	// 2. Get Model Config
@@ -184,7 +223,7 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 	// 5. Messages
 	messages := []*schema.Message{
 		{Role: schema.System, Content: targetAgent.SystemPrompt},
-		{Role: schema.User, Content: query},
+		{Role: schema.User, Content: userMessage},
 	}
 
 	// 6. Loop
@@ -238,61 +277,10 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 			}
 
 			resultStr := ""
-			handled := false
+			var toolErr error
 
-			// Builtins
+			// Specialized internal tools that need ChatService context
 			switch fnName {
-			case "read_file":
-				path, _ := args["path"].(string)
-				p, _ := builtin.ResolvePathInBase(projectRoot, path)
-				resultStr, _ = builtin.ReadFile(p)
-				handled = true
-			case "read_file_range":
-				path, _ := args["path"].(string)
-				startLine, _ := args["startLine"].(float64)
-				limit, _ := args["limit"].(float64)
-				p, _ := builtin.ResolvePathInBase(projectRoot, path)
-				resultStr, _ = builtin.ReadFileRange(p, int(startLine), int(limit))
-				handled = true
-			case "diff_file":
-				path1, _ := args["path1"].(string)
-				path2, _ := args["path2"].(string)
-				p1, _ := builtin.ResolvePathInBase(projectRoot, path1)
-				p2, _ := builtin.ResolvePathInBase(projectRoot, path2)
-				resultStr, _ = builtin.DiffFile(p1, p2)
-				handled = true
-			case "write_file":
-				path, _ := args["path"].(string)
-				content, _ := args["content"].(string)
-				p, _ := builtin.ResolvePathInBase(projectRoot, path)
-				resultStr, _ = builtin.WriteFile(p, content)
-				handled = true
-			case "list_files":
-				path, _ := args["path"].(string)
-				p, _ := builtin.ResolvePathInBase(projectRoot, path)
-				resultStr, _ = builtin.ListFiles(p)
-				handled = true
-			case "run_command":
-				cmd, _ := args["command"].(string)
-				var cmdArgs []string
-				if argsRaw, ok := args["args"].([]interface{}); ok {
-					for _, a := range argsRaw {
-						cmdArgs = append(cmdArgs, fmt.Sprint(a))
-					}
-				}
-				resultStr, _ = builtin.RunCommand(cmd, cmdArgs)
-				handled = true
-			case "run_script":
-				scriptPath, _ := args["scriptPath"].(string)
-				sp, _ := builtin.ResolvePathInBase(projectRoot, scriptPath)
-				var scriptArgs []string
-				if argsRaw, ok := args["args"].([]interface{}); ok {
-					for _, a := range argsRaw {
-						scriptArgs = append(scriptArgs, fmt.Sprint(a))
-					}
-				}
-				resultStr, _ = builtin.RunScript(sp, scriptArgs)
-				handled = true
 			case "call_subagent":
 				// Recursive call with depth tracking
 				an, _ := args["agentName"].(string)
@@ -301,14 +289,8 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				if subTask != nil {
 					taskID = subTask.TaskID
 				}
-				var subErr error
-				resultStr, subErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode, depth+1, taskID, eventChan)
-				if subErr != nil {
-					resultStr = fmt.Sprintf("Error calling sub-agent: %v", subErr)
-				}
-				handled = true
+				resultStr, toolErr = s.RunAgentInternal(sessionID, an, q, projectRoot, effectiveMode, depth+1, taskID, eventChan)
 			case "check_subagent_status":
-				// Query sub-agent task status
 				queryTaskID, _ := args["taskId"].(string)
 				if s.subAgentTaskService != nil && queryTaskID != "" {
 					task, err := s.subAgentTaskService.GetTask(queryTaskID)
@@ -329,7 +311,6 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				} else {
 					resultStr = "Error: SubAgentTaskService not available or taskId missing"
 				}
-				handled = true
 			case "manage_tasks":
 				action, _ := args["action"].(string)
 				content, _ := args["content"].(string)
@@ -392,43 +373,13 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName, query, project
 				default:
 					resultStr = fmt.Sprintf("Unknown action: %s", action)
 				}
-				handled = true
+			default:
+				// Delegate to ToolService
+				resultStr, toolErr = s.toolService.Call(ctx, fnName, args, targetAgent, projectRoot)
 			}
 
-			if !handled {
-				// Script Tool Lookup
-				var foundTool *model.Tool
-				for _, t := range targetAgent.Tools {
-					if t.Name == fnName && (t.Type == consts.ToolTypeCustom || t.Type == consts.ToolTypeScript) {
-						foundTool = &t
-						break
-					}
-				}
-				if foundTool != nil {
-					engine := script.NewScriptEngineWithBaseDir(projectRoot)
-					engine.RegisterTool("args", args)
-					res, err := engine.Run(foundTool.Content)
-					if err != nil {
-						resultStr = fmt.Sprintf("Error: %v", err)
-					} else {
-						resultStr = fmt.Sprintf("%v", res)
-					}
-					handled = true
-				}
-			}
-
-			if !handled && s.mcpService != nil {
-				res, err := s.mcpService.CallTool(ctx, fnName, args)
-				if err == nil {
-					resultStr = res
-					handled = true
-				} else {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				}
-			}
-
-			if !handled && resultStr == "" {
-				resultStr = fmt.Sprintf("Error: Tool '%s' not found", fnName)
+			if toolErr != nil {
+				resultStr = fmt.Sprintf("Error: %v", toolErr)
 			}
 
 			messages = append(messages, &schema.Message{
@@ -858,6 +809,48 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		return fmt.Errorf("failed to init ai client: %v", err)
 	}
 
+	// [New] Check if Orchestration is needed
+	if (effectiveMode == "plan" || effectiveMode == "build") && s.plannerFactory != nil {
+		planner := s.plannerFactory(aiClient)
+		tree, err := planner.Plan(ctx, userMessage)
+		if err == nil && tree != nil && len(tree.Tasks) > 0 {
+			// Trigger Execution Engine
+			// Note: In a real scenario, we might want to return the plan first for confirmation
+			// But for now, let's emit a 'workflow_start' event
+			s.emitEvent(sessionID, chat.ChatEvent{
+				Type: "workflow_start",
+				Extra: map[string]any{
+					"goal":  tree.Goal,
+					"tasks": tree.Tasks,
+				},
+			}, eventChan)
+
+			// Trigger Execution Engine asynchronously
+			if s.executor != nil {
+				go func() {
+					// Convert SubTasks to WorkflowTasks and execute
+					// This is a simplified version
+					workflow := &model.Workflow{
+						SessionID: sessionID,
+						Goal:      tree.Goal,
+					}
+					var tasks []model.WorkflowTask
+					for _, st := range tree.Tasks {
+						deps, _ := json.Marshal(st.DependsOn)
+						tasks = append(tasks, model.WorkflowTask{
+							TaskID:      st.ID,
+							Title:       st.Title,
+							Description: st.Description,
+							Capability:  st.Capability,
+							DependsOn:   string(deps),
+						})
+					}
+					s.executor.ExecuteWorkflow(context.Background(), workflow, tasks)
+				}()
+			}
+		}
+	}
+
 	// 6. Construct Messages (System + User)
 	// Save User Message
 	userMsg := &model.Message{
@@ -921,7 +914,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 	for i := 0; i < maxTurns; i++ {
 		if ctx.Err() != nil {
-			eventChan <- chat.ChatEvent{Type: chat.ChatEventTerminated}
+			s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventTerminated}, eventChan)
 			return nil
 		}
 		// Create a copy of messages to avoid race conditions if needed,
@@ -938,7 +931,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 		stream, err := aiClient.StreamChat(ctx, messages)
 		if err != nil {
-			eventChan <- chat.ChatEvent{Type: chat.ChatEventError, Content: err.Error()}
+			s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventError, Content: err.Error()}, eventChan)
 			return nil
 		}
 
@@ -959,7 +952,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			// Handle Content
 			if chunk.Content != "" {
 				fullResponse += chunk.Content
-				eventChan <- chat.ChatEvent{Type: chat.ChatEventChunk, Content: chunk.Content}
+				s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventChunk, Content: chunk.Content}, eventChan)
 			}
 
 			// Handle Tool Calls (Accumulate)
@@ -999,7 +992,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		}
 		stream.Close()
 		if ctx.Err() != nil {
-			eventChan <- chat.ChatEvent{Type: chat.ChatEventTerminated}
+			s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventTerminated}, eventChan)
 			return nil
 		}
 
@@ -1094,196 +1087,20 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 			// 3. Execute
 			resultStr := ""
+			var toolErr error
 
 			switch fnName {
-			case "read_file":
-				path, _ := args["path"].(string)
-				p, rerr := builtin.ResolvePathInBase(projectRoot, path)
-				if rerr != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr)
-					break
-				}
-				if agent.Mode.Key == "plan" && !strings.Contains(p, "plan") {
-				}
-				res, err := builtin.ReadFile(p)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "read_file_range":
-				path, _ := args["path"].(string)
-				startLine, _ := args["startLine"].(float64)
-				limit, _ := args["limit"].(float64)
-
-				p, rerr := builtin.ResolvePathInBase(projectRoot, path)
-				if rerr != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr)
-					break
-				}
-
-				res, err := builtin.ReadFileRange(p, int(startLine), int(limit))
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "diff_file":
-				path1, _ := args["path1"].(string)
-				path2, _ := args["path2"].(string)
-
-				p1, rerr1 := builtin.ResolvePathInBase(projectRoot, path1)
-				if rerr1 != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr1)
-					break
-				}
-
-				p2, rerr2 := builtin.ResolvePathInBase(projectRoot, path2)
-				if rerr2 != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr2)
-					break
-				}
-
-				res, err := builtin.DiffFile(p1, p2)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "write_file":
-				path, _ := args["path"].(string)
-				content, _ := args["content"].(string)
-				p, rerr := builtin.ResolvePathInBase(projectRoot, path)
-				if rerr != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr)
-					break
-				}
-				res, err := builtin.WriteFile(p, content)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "list_files":
-				path, _ := args["path"].(string)
-				p, rerr := builtin.ResolvePathInBase(projectRoot, path)
-				if rerr != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr)
-					break
-				}
-				res, err := builtin.ListFiles(p)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "run_command":
-				cmd, _ := args["command"].(string)
-				var cmdArgs []string
-				if argsRaw, ok := args["args"].([]interface{}); ok {
-					for _, a := range argsRaw {
-						cmdArgs = append(cmdArgs, fmt.Sprint(a))
-					}
-				}
-				res, err := builtin.RunCommand(cmd, cmdArgs)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "run_script":
-				scriptPath, _ := args["scriptPath"].(string)
-				sp, rerr := builtin.ResolvePathInBase(projectRoot, scriptPath)
-				if rerr != nil {
-					resultStr = fmt.Sprintf("Error: %v", rerr)
-					break
-				}
-				var scriptArgs []string
-				if argsRaw, ok := args["args"].([]interface{}); ok {
-					for _, a := range argsRaw {
-						scriptArgs = append(scriptArgs, fmt.Sprint(a))
-					}
-				}
-				res, err := builtin.RunScript(sp, scriptArgs)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "http_get":
-				url, _ := args["url"].(string)
-				res, err := builtin.HttpGet(url)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "http_post":
-				url, _ := args["url"].(string)
-				body, _ := args["body"].(string)
-				ctype, _ := args["contentType"].(string)
-				res, err := builtin.HttpPost(url, ctype, body)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = res
-				}
-			case "index_project":
-				all, _ := args["all"].(bool)
-				pid := uint(0)
-				if pv, ok := args["projectId"].(float64); ok && pv > 0 {
-					pid = uint(pv)
-				}
-				if !all && pid == 0 {
-					if project != nil {
-						pid = project.ID
-					} else {
-						pid = session.ProjectID
-					}
-				}
-				indexSvc := NewIndexService()
-				if all {
-					info, err := indexSvc.IndexAllProjects()
-					if err != nil {
-						resultStr = fmt.Sprintf("Error: %v", err)
-					} else {
-						resultStr = fmt.Sprintf("success: indexed=%d files=%d dbPath=%s", info.Indexed, info.Files, info.DBPath)
-					}
-					break
-				}
-				if pid == 0 {
-					resultStr = "Error: projectId is required"
-					break
-				}
-				info, err := indexSvc.IndexProject(pid)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error: %v", err)
-				} else {
-					resultStr = fmt.Sprintf("success: indexed=%d files=%d dbPath=%s", info.Indexed, info.Files, info.DBPath)
-				}
 			case "call_subagent":
-				agentName, _ := args["agentName"].(string)
-				query, _ := args["query"].(string)
-
 				// Notify Start of SubAgent
 				s.sendToolEvent(sessionID, map[string]interface{}{
 					"stage":      "subagent_start",
 					"name":       "call_subagent",
-					"agentName":  agentName,
+					"agentName":  args["agentName"],
 					"toolCallId": tc.ID,
 				}, eventChan)
 
 				// Run Internal Agent
-				res, err := s.RunAgentInternal(sessionID, agentName, query, projectRoot, agent.Mode.Key, 0, "", eventChan)
-				if err != nil {
-					resultStr = fmt.Sprintf("Error calling sub-agent '%s': %v", agentName, err)
-				} else {
-					resultStr = res
-				}
-
-				// Notify End of SubAgent (with partial content if needed, but resultStr is final)
-				// The resultStr will be sent via standard tool result event
-
+				resultStr, toolErr = s.RunAgentInternal(sessionID, fmt.Sprint(args["agentName"]), fmt.Sprint(args["query"]), projectRoot, effectiveMode, 0, "", eventChan)
 			case "manage_tasks":
 				action, _ := args["action"].(string)
 				content, _ := args["content"].(string)
@@ -1366,52 +1183,12 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 					}
 				}
 			default:
-				// Check if it's a script tool
-				// Currently we don't have a way to know if a tool name belongs to a script tool directly from memory,
-				// unless we loaded them.
-				// Assuming custom tools are stored in DB and loaded into context.
-				// For now, let's look up the tool in the agent's tools list.
-				var foundTool *model.Tool
-				for _, t := range agent.Tools {
-					// Support both "custom" and "script" types for now, as UI sends "script"
-					if t.Name == fnName && (t.Type == consts.ToolTypeCustom || t.Type == consts.ToolTypeScript) {
-						foundTool = &t
-						break
-					}
-				}
+				// Delegate to ToolService
+				resultStr, toolErr = s.toolService.Call(ctx, fnName, args, agent, projectRoot)
+			}
 
-				if foundTool != nil {
-					// Execute Script
-					engine := script.NewScriptEngineWithBaseDir(projectRoot)
-					// Inject arguments as global variables or call a function wrapper
-					// Better approach: wrap the script content in a function call or set variables and run.
-					// Simplest: Set 'args' variable and run script.
-					// BUT, usually script tool content IS the function body or a full script.
-					// Let's assume content is the script code.
-
-					// Inject args
-					engine.RegisterTool("args", args)
-
-					// Run script
-					res, err := engine.Run(foundTool.Content)
-					if err != nil {
-						resultStr = fmt.Sprintf("Error executing script tool: %v", err)
-					} else {
-						resultStr = fmt.Sprintf("%v", res)
-					}
-				} else {
-					handled := false
-					if s.mcpService != nil {
-						res, err := s.mcpService.CallTool(ctx, fnName, args)
-						if err == nil {
-							resultStr = res
-							handled = true
-						}
-					}
-					if !handled {
-						resultStr = fmt.Sprintf("Error: Tool function '%s' not found", fnName)
-					}
-				}
+			if toolErr != nil {
+				resultStr = fmt.Sprintf("Error: %v", toolErr)
 			}
 
 			// ... (upsert result)

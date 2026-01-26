@@ -15,4 +15,9 @@ type Agent struct {
 	ExternalURL  string `json:"externalUrl"`
 	ExternalType string `json:"externalType"`
 	ExternalParams string `json:"externalParams" gorm:"type:text"`
+	Status         string `json:"status" gorm:"default:'offline'"` // online, offline, busy
+	Capabilities   string `json:"capabilities" gorm:"type:text"`   // JSON array of Capability
+	ConfigSchema   string `json:"configSchema" gorm:"type:text"`   // JSON Schema for agent-specific config
+	MemoryPolicy   string `json:"memoryPolicy" gorm:"type:text"`   // JSON for memory retention/sharing policy
+	LastHeartbeat  int64  `json:"lastHeartbeat"`
 }

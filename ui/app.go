@@ -153,36 +153,40 @@ func (a *App) ListAgents() *result.Result {
 	return a.proxyRequest(http.MethodGet, "/agents", nil)
 }
 
-func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) *result.Result {
+func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) *result.Result {
 	payload := map[string]interface{}{
-		"name":         name,
-		"description":  description,
-		"systemPrompt": systemPrompt,
-		"type":         agentType,
-		"modelId":      modelID,
-		"toolIds":      toolIDs,
-		"mcpServerIds": mcpServerIDs,
-		"modeId":       modeID,
-		"externalUrl":  externalURL,
-		"externalType": externalType,
+		"name":           name,
+		"description":    description,
+		"systemPrompt":   systemPrompt,
+		"type":           agentType,
+		"modelId":        modelID,
+		"toolIds":        toolIDs,
+		"mcpServerIds":   mcpServerIDs,
+		"modeId":         modeID,
+		"externalUrl":    externalURL,
+		"externalType":   externalType,
 		"externalParams": externalParams,
+		"status":         status,
+		"capabilities":   capabilities,
 	}
 	return a.proxyRequest(http.MethodPost, "/agents", payload)
 }
 
-func (a *App) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint) *result.Result {
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) *result.Result {
 	payload := map[string]interface{}{
-		"name":         name,
-		"description":  description,
-		"systemPrompt": systemPrompt,
-		"type":         agentType,
-		"modelId":      modelID,
-		"toolIds":      toolIDs,
-		"mcpServerIds": mcpServerIDs,
-		"modeId":       modeID,
-		"externalUrl":  externalURL,
-		"externalType": externalType,
+		"name":           name,
+		"description":    description,
+		"systemPrompt":   systemPrompt,
+		"type":           agentType,
+		"modelId":        modelID,
+		"toolIds":        toolIDs,
+		"mcpServerIds":   mcpServerIDs,
+		"modeId":         modeID,
+		"externalUrl":    externalURL,
+		"externalType":   externalType,
 		"externalParams": externalParams,
+		"status":         status,
+		"capabilities":   capabilities,
 	}
 	return a.proxyRequest(http.MethodPut, fmt.Sprintf("/agents/%d", id), payload)
 }

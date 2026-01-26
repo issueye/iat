@@ -227,6 +227,10 @@ func (s *MCPService) GetGlobalTools(ctx context.Context) ([]*schema.ToolInfo, er
 	return s.GetToolsForServers(servers)
 }
 
+func (s *MCPService) ListAllTools(ctx context.Context) ([]*schema.ToolInfo, error) {
+	return s.GetGlobalTools(ctx)
+}
+
 func (s *MCPService) ListToolsForServer(serverID uint) ([]*schema.ToolInfo, error) {
 	server, err := s.repo.GetByID(serverID)
 	if err != nil {

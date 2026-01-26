@@ -3,6 +3,7 @@ package script
 import (
 	"errors"
 	"iat/common/pkg/script/modules"
+	"time"
 
 	"github.com/dop251/goja"
 )
@@ -17,13 +18,37 @@ func NewScriptEngine() *ScriptEngine {
 	return &ScriptEngine{vm: vm}
 }
 
-// Run executes a JS script and returns the exported value
 func (e *ScriptEngine) Run(script string) (interface{}, error) {
-	val, err := e.vm.RunString(script)
-	if err != nil {
-		return nil, errors.New(err.Error())
+	return e.RunWithTimeout(script, 30*time.Second)
+}
+
+// Run executes a JS script and returns the exported value with a timeout
+func (e *ScriptEngine) RunWithTimeout(script string, timeout time.Duration) (interface{}, error) {
+	type result struct {
+		val interface{}
+		err error
 	}
-	return val.Export(), nil
+
+	resCh := make(chan result, 1)
+
+	timer := time.AfterFunc(timeout, func() {
+		e.vm.Interrupt("timeout")
+	})
+	defer timer.Stop()
+
+	go func() {
+		val, err := e.vm.RunString(script)
+		if err != nil {
+			resCh <- result{err: errors.New(err.Error())}
+		} else {
+			resCh <- result{val: val.Export()}
+		}
+	}()
+
+	select {
+	case res := <-resCh:
+		return res.val, res.err
+	}
 }
 
 // RegisterGlobal registers a Go value or function in the JS global scope

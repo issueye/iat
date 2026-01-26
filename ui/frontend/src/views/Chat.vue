@@ -102,6 +102,11 @@
       </div>
 
       <div class="chat-main-content">
+        <WorkflowCanvas
+          v-if="currentWorkflowTasks.length > 0"
+          :tasks="currentWorkflowTasks"
+          style="margin-bottom: 10px"
+        />
         <BubbleList
           :list="messages"
           :loading="isGenerating"
@@ -161,6 +166,14 @@
               <n-button text color="#8a2be2" @click="showPromptModalFn(item)">
                 {{ item.type === "tool" ? "输出" : "输入" }}
               </n-button>
+              <n-button
+                text
+                size="tiny"
+                style="margin-left: 8px"
+                @click="showDebugDrawer = true"
+              >
+                调试
+              </n-button>
 
               <!-- token -->
               <span class="token-usage" v-if="item.type !== 'tool'">
@@ -218,33 +231,46 @@
     <n-modal
       v-model:show="showPromptModal"
       preset="dialog"
-      :title="currentViewPrompt.type === 'tool' ? '工具调用' : '输入'"
+      :title="
+        viewType === 'diff'
+          ? '文件差异'
+          : viewType === 'tree'
+            ? '文件目录'
+            : '详细信息'
+      "
       style="width: 80%"
     >
-      <pre
-        style="
-          text-align: left;
-          max-height: 80vh;
-          overflow: auto;
-          white-space: pre-wrap;
-        "
-      >
-        {{ currentViewPrompt }}
-        </pre
-      >
-      <!-- <XMarkdown
-        :markdown="currentViewPrompt"
-        default-theme-mode="light"
-        style="
-          text-align: left;
-          margin-top: 8px;
-          width: 100%;
-          max-height: 80vh;
-          overflow: auto;
-        "
-        :code-x-props="{ enableCodeLineNumber: true }"
-      /> -->
+      <div style="max-height: 80vh; overflow: auto">
+        <ResultRenderer
+          :content="currentViewPrompt"
+          :type="viewType"
+          :metadata="viewMetadata"
+        />
+      </div>
     </n-modal>
+
+    <!-- Debug Console Drawer -->
+    <n-drawer v-model:show="showDebugDrawer" :width="500" placement="right">
+      <n-drawer-content title="系统调试日志" closable>
+        <template #header-extra>
+          <n-button size="tiny" secondary @click="debugStore.clear()"
+            >清空</n-button
+          >
+        </template>
+        <div class="debug-logs">
+          <div v-for="log in logs" :key="log.id" class="log-item">
+            <div class="log-meta">
+              <span class="log-time">{{ log.time }}</span>
+              <n-tag size="small" :bordered="false" type="info">{{
+                log.type
+              }}</n-tag>
+            </div>
+            <pre class="log-data">{{ log.data }}</pre>
+          </div>
+          <div v-if="logs.length === 0" class="empty-logs">暂无实时日志</div>
+        </div>
+      </n-drawer-content>
+    </n-drawer>
   </div>
 </template>
 
@@ -262,6 +288,7 @@ import {
   NSelect,
   NTag,
   NModal,
+  NAvatar,
 } from "naive-ui";
 import {
   TrashOutline,
@@ -273,8 +300,15 @@ import {
   StopCircleOutline,
 } from "@vicons/ionicons5";
 import { api } from "../api";
+import { useAgentStore } from "../store/agent";
+import { useChatStore } from "../store/chat";
+import { useProjectStore } from "../store/project";
+import { useWorkflowStore } from "../store/workflow";
+import { useDebugStore } from "../store/debug";
 import SubAgentCard from "../components/SubAgentCard.vue";
 import Thinking from "../components/Thinking.vue";
+import WorkflowCanvas from "../components/workflow/WorkflowCanvas.vue";
+import ResultRenderer from "../components/renderers/ResultRenderer.vue";
 import {
   ChatModes,
   ChatRoles,
@@ -289,18 +323,38 @@ const router = useRouter();
 const message = useMessage();
 const dialog = useDialog();
 
-// State
-const projects = ref([]);
-const sessions = ref([]);
-const agents = ref([]);
-const currentProjectId = ref(null);
-const currentSessionId = ref(null);
+const agentStore = useAgentStore();
+const chatStore = useChatStore();
+const projectStore = useProjectStore();
+const workflowStore = useWorkflowStore();
+const debugStore = useDebugStore();
+
+// State from stores
+const projects = computed(() => projectStore.projects);
+const sessions = computed(() => chatStore.sessions);
+const agents = computed(() => agentStore.agents);
+const logs = computed(() => debugStore.logs);
+const showDebugDrawer = ref(false);
+const currentProjectId = computed({
+  get: () => projectStore.currentProjectId,
+  set: (val) => projectStore.setCurrentProject(val),
+});
+const currentSessionId = computed({
+  get: () => chatStore.currentSessionId,
+  set: (val) => chatStore.fetchMessages(val),
+});
 const currentChatMode = ref(ChatModes.Chat);
 const currentChatAgentId = ref(null);
-const messages = ref([]);
-const inputText = ref("");
-const isGenerating = ref(false);
+const messages = computed(() => chatStore.messages);
+const inputText = computed({
+  get: () => chatStore.input,
+  set: (val) => (chatStore.input = val),
+});
+const isGenerating = computed(() => chatStore.streaming);
 const generationStatus = ref(ThinkingStatuses.End);
+
+// Workflow state
+const currentWorkflowTasks = computed(() => workflowStore.tasks);
 
 // Sub-Agent Tasks State
 const subAgentTaskMap = ref(new Map());
@@ -349,6 +403,8 @@ const selectedAgentId = ref(null);
 const showDetailModal = ref(false);
 const showPromptModal = ref(false);
 const currentViewPrompt = ref("");
+const viewType = ref("text");
+const viewMetadata = ref({});
 const toolInvocations = ref([]);
 const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
@@ -369,22 +425,49 @@ const agentOptions = computed(() => {
 });
 
 const showPromptModalFn = (item) => {
+  viewType.value = "text";
+  viewMetadata.value = {};
+
   switch (item.type) {
     case "tool":
       {
-        // toolOutput
         currentViewPrompt.value = item.toolOutput || "";
+        const toolName = item.toolName;
+
+        if (toolName === "list_files") {
+          viewType.value = "tree";
+        } else if (toolName === "diff_file") {
+          viewType.value = "diff";
+          viewMetadata.value = { language: "diff" };
+        } else if (toolName === "read_file" || toolName === "read_file_range") {
+          viewType.value = "code";
+          // Try to get language from path in arguments
+          try {
+            const args = JSON.parse(item.toolArguments || "{}");
+            const path = args.path || "";
+            const ext = path.split(".").pop();
+            viewMetadata.value = { path, language: ext };
+          } catch (e) {}
+        } else {
+          // Check if it's JSON
+          try {
+            JSON.parse(currentViewPrompt.value);
+            viewType.value = "code";
+            viewMetadata.value = { language: "json" };
+          } catch (e) {}
+        }
       }
       break;
     case "message":
       {
         currentViewPrompt.value = item.prompt || "";
         if (currentViewPrompt.value) {
-          currentViewPrompt.value = JSON.stringify(
-            JSON.parse(currentViewPrompt.value),
-            null,
-            2,
-          );
+          try {
+            const parsed = JSON.parse(currentViewPrompt.value);
+            currentViewPrompt.value = JSON.stringify(parsed, null, 2);
+            viewType.value = "code";
+            viewMetadata.value = { language: "json" };
+          } catch (e) {}
         }
       }
       break;
@@ -470,9 +553,7 @@ let eventSource = null;
 
 watch(currentProjectId, (newVal) => {
   if (newVal) {
-    loadSessions(newVal);
-    currentSessionId.value = null;
-    messages.value = [];
+    chatStore.fetchSessions(newVal);
   }
 });
 
@@ -483,26 +564,6 @@ watch(currentSessionId, async (newVal) => {
     if (sess && sess.agentId) {
       currentChatAgentId.value = sess.agentId;
     }
-
-    try {
-      const msgs = await api.getSessionMessages(newVal);
-      // Convert backend message format to UI format
-      messages.value = (msgs || []).map((m) => ({
-        type: m.toolName ? "tool" : "message",
-        role: m.role,
-        content: m.content,
-        createdAt: m.createdAt,
-        prompt: m.prompt,
-        toolName: m.toolName,
-        toolArguments: m.toolArguments,
-        toolOutput: m.toolOutput,
-        tokenUsage: m.tokenCount,
-      }));
-    } catch (e) {
-      message.error("加载消息失败: " + e.message);
-    }
-  } else {
-    messages.value = [];
   }
 });
 
@@ -516,8 +577,7 @@ async function handleClear() {
     negativeText: "取消",
     onPositiveClick: async () => {
       try {
-        await api.clearSessionMessages(currentSessionId.value);
-        messages.value = [];
+        await chatStore.clearHistory();
         message.success("上下文已清空");
       } catch (e) {
         message.error("清空失败: " + e.message);
@@ -531,41 +591,10 @@ async function handleStop() {
   try {
     await api.abortSession(currentSessionId.value);
     message.info("已请求停止生成");
-    isGenerating.value = false;
+    chatStore.setStreaming(false);
     generationStatus.value = ThinkingStatuses.Cancel;
   } catch (e) {
     message.error("停止失败: " + e.message);
-  }
-}
-
-async function loadProjects() {
-  try {
-    const data = await api.listProjects();
-    projects.value = data || [];
-    if (!currentProjectId.value && projects.value.length > 0) {
-      currentProjectId.value = projects.value[0].id;
-    }
-  } catch (e) {
-    message.error("加载项目失败: " + e.message);
-  }
-}
-
-async function loadAgents() {
-  try {
-    const data = await api.listAgents();
-    agents.value = data || [];
-  } catch (e) {
-    message.error("加载智能体失败: " + e.message);
-  }
-}
-
-async function loadSessions(projectId) {
-  if (!projectId) return;
-  try {
-    const data = await api.listSessions(projectId);
-    sessions.value = data || [];
-  } catch (e) {
-    message.error("加载会话失败: " + e.message);
   }
 }
 
@@ -581,8 +610,8 @@ async function handleSend(val) {
     return;
   }
 
-  inputText.value = "";
-  isGenerating.value = true;
+  chatStore.input = "";
+  chatStore.setStreaming(true);
   generationStatus.value = ThinkingStatuses.Start;
 
   // Add User Message
@@ -591,11 +620,11 @@ async function handleSend(val) {
     content: content,
     createdAt: new Date().toISOString(),
   };
-  messages.value.push(sendData);
+  chatStore.addMessage(sendData);
 
   // Add Assistant Placeholder
   const aiMsgIndex =
-    messages.value.push({
+    chatStore.addMessage({
       role: ChatRoles.Assistant,
       content: "",
       createdAt: new Date().toISOString(),
@@ -647,17 +676,26 @@ async function handleSend(val) {
     }
   } catch (e) {
     message.error("发送失败: " + e.message);
-    messages.value[aiMsgIndex].content = "[Error: " + e.message + "]";
+    chatStore.messages[aiMsgIndex].content = "[Error: " + e.message + "]";
     generationStatus.value = ThinkingStatuses.Error;
   } finally {
-    isGenerating.value = false;
+    chatStore.setStreaming(false);
     generationStatus.value = ThinkingStatuses.End;
   }
 }
 
 function handleSSEEvent(data, aiMsgIndex) {
   if (data.type === "chunk") {
-    messages.value[aiMsgIndex].content += data.content;
+    chatStore.messages[aiMsgIndex].content += data.content;
+  } else if (data.type === "workflow_start") {
+    const { goal, tasks } = data.extra || {};
+    workflowStore.tasks = (tasks || []).map((t) => ({
+      ...t,
+      status: "pending",
+    }));
+  } else if (data.type === "task_status") {
+    const { taskId, status, output } = data.extra || {};
+    workflowStore.updateTaskStatus(taskId, status, output);
   } else if (data.type === "tool_call") {
     const {
       stage,
@@ -716,7 +754,7 @@ function handleSSEEvent(data, aiMsgIndex) {
       }
     } else {
       // Standard tool call
-      messages.value.push({
+      chatStore.addMessage({
         role: ChatRoles.Tool,
         toolName: data.extra.name,
         toolArguments: data.extra.arguments,
@@ -732,12 +770,46 @@ function handleSSEEvent(data, aiMsgIndex) {
 
 // Lifecycle
 onMounted(() => {
-  loadProjects();
-  loadAgents();
+  projectStore.fetchProjects();
+  agentStore.fetchAll();
+  chatStore.initWS();
 });
 </script>
 
 <style scoped>
+.debug-logs {
+  font-family: "Fira Code", monospace;
+  font-size: 11px;
+}
+.log-item {
+  margin-bottom: 12px;
+  border-bottom: 1px solid #f0f0f0;
+  padding-bottom: 8px;
+}
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.log-time {
+  color: #999;
+}
+.log-data {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #444;
+  background: #f9f9f9;
+  padding: 4px;
+  border-radius: 2px;
+}
+.empty-logs {
+  text-align: center;
+  color: #ccc;
+  padding: 40px 0;
+}
+
 .chat-container {
   display: flex;
   height: 100%;

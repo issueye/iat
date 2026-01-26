@@ -9,6 +9,51 @@ const client = axios.create({
   },
 });
 
+export const getProjects = async () => {
+  const resp = await client.get("/projects");
+  return resp.data;
+};
+
+export const getAgents = async () => {
+  const resp = await client.get("/agents");
+  return resp.data;
+};
+
+export const getModels = async () => {
+  const resp = await client.get("/models");
+  return resp.data;
+};
+
+export const getModes = async () => {
+  const resp = await client.get("/modes");
+  return resp.data;
+};
+
+export const getSessions = async (projectId: number) => {
+  const resp = await client.get(`/sessions?projectId=${projectId}`);
+  return resp.data;
+};
+
+export const getMessages = async (id: number) => {
+  const resp = await client.get(`/sessions/${id}/messages`);
+  return resp.data;
+};
+
+export const deleteMessages = async (id: number) => {
+  const resp = await client.delete(`/sessions/${id}/messages`);
+  return resp.data;
+};
+
+export const getWorkflows = async (sessionId: number) => {
+  const resp = await client.get(`/workflows?sessionId=${sessionId}`);
+  return resp.data;
+};
+
+export const getWorkflowTasks = async (workflowId: number) => {
+  const resp = await client.get(`/workflows/${workflowId}/tasks`);
+  return resp.data;
+};
+
 export const api = {
   checkHealth: async () => {
     const resp = await client.get("/health");
@@ -24,16 +69,10 @@ export const api = {
   },
 
   // Agent Methods
-  listAgents: async () => {
-    const resp = await client.get("/agents");
-    return resp.data;
-  },
+  listAgents: getAgents,
 
   // Session Methods
-  listSessions: async (projectId: number) => {
-    const resp = await client.get(`/sessions?projectId=${projectId}`);
-    return resp.data;
-  },
+  listSessions: getSessions,
   createSession: async (name: string, projectId: number, agentId: number) => {
     const resp = await client.post("/sessions", { name, projectId, agentId });
     return resp.data;
@@ -46,14 +85,8 @@ export const api = {
     const resp = await client.delete(`/sessions/${id}`);
     return resp.data;
   },
-  getSessionMessages: async (id: number) => {
-    const resp = await client.get(`/sessions/${id}/messages`);
-    return resp.data;
-  },
-  clearSessionMessages: async (id: number) => {
-    const resp = await client.delete(`/sessions/${id}/messages`);
-    return resp.data;
-  },
+  getSessionMessages: getMessages,
+  clearSessionMessages: deleteMessages,
   abortSession: async (id: number) => {
     const resp = await client.post(`/sessions/${id}/abort`);
     return resp.data;

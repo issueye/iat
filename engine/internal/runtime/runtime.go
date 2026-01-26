@@ -36,6 +36,8 @@ type Runtime struct {
 	mu              sync.RWMutex
 	bus             *EventBus
 	chatService     *service.ChatService
+	registryService *service.RegistryService
+	toolService     *service.ToolService
 	globalTools     map[string]Tool
 	pending         map[string]chan protocol.Message
 	pendingMu       sync.Mutex
@@ -43,14 +45,16 @@ type Runtime struct {
 	timestampSerial atomic.Int64
 }
 
-func NewRuntime(chatService *service.ChatService) *Runtime {
+func NewRuntime(chatService *service.ChatService, registryService *service.RegistryService, toolService *service.ToolService) *Runtime {
 	return &Runtime{
-		agents:      make(map[string]*AgentInstance),
-		bus:         NewEventBus(),
-		chatService: chatService,
-		globalTools: make(map[string]Tool),
-		pending:     make(map[string]chan protocol.Message),
-		clock:       func() int64 { return time.Now().UnixMilli() },
+		agents:          make(map[string]*AgentInstance),
+		bus:             NewEventBus(),
+		chatService:     chatService,
+		registryService: registryService,
+		toolService:     toolService,
+		globalTools:     make(map[string]Tool),
+		pending:         make(map[string]chan protocol.Message),
+		clock:           func() int64 { return time.Now().UnixMilli() },
 	}
 }
 

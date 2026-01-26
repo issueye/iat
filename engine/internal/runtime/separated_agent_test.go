@@ -8,7 +8,7 @@ import (
 )
 
 func TestSeparatedAgentIsolationAndTools(t *testing.T) {
-	rt := NewRuntime(nil)
+	rt := NewRuntime(nil, nil, nil)
 	rt.RegisterGlobalTool("uppercase", func(ctx context.Context, args map[string]any) (any, error) {
 		s, _ := args["text"].(string)
 		out := ""

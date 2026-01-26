@@ -21,7 +21,7 @@ func (h *RuntimeTestHandler) Run(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rt := runtime.NewRuntime(nil)
+	rt := runtime.NewRuntime(nil, nil, nil)
 	rt.RegisterGlobalTool("uppercase", func(ctx context.Context, args map[string]any) (any, error) {
 		s, _ := args["text"].(string)
 		return strings.ToUpper(s), nil

@@ -4,9 +4,10 @@ type TaskStatus string
 
 const (
 	TaskStatusPending    TaskStatus = "pending"
-	TaskStatusInProgress TaskStatus = "in_progress"
+	TaskStatusInProgress TaskStatus = "running"
 	TaskStatusCompleted  TaskStatus = "completed"
 	TaskStatusFailed     TaskStatus = "failed"
+	TaskStatusSkipped    TaskStatus = "skipped"
 )
 
 type Task struct {

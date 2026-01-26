@@ -42,7 +42,11 @@
             placeholder="选择类型"
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type !== 'external'" label="模型" path="modelId">
+        <n-form-item
+          v-if="formValue.type !== 'external'"
+          label="模型"
+          path="modelId"
+        >
           <n-select
             v-model:value="formValue.modelId"
             :options="modelOptions"
@@ -50,7 +54,11 @@
             clearable
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type !== 'external'" label="关联工具" path="toolIds">
+        <n-form-item
+          v-if="formValue.type !== 'external'"
+          label="关联工具"
+          path="toolIds"
+        >
           <n-select
             v-model:value="formValue.toolIds"
             multiple
@@ -58,7 +66,11 @@
             placeholder="选择工具"
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type !== 'external'" label="关联 MCP 服务" path="mcpServerIds">
+        <n-form-item
+          v-if="formValue.type !== 'external'"
+          label="关联 MCP 服务"
+          path="mcpServerIds"
+        >
           <n-select
             v-model:value="formValue.mcpServerIds"
             multiple
@@ -66,7 +78,11 @@
             placeholder="选择 MCP 服务"
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type !== 'external'" label="系统提示词" path="systemPrompt">
+        <n-form-item
+          v-if="formValue.type !== 'external'"
+          label="系统提示词"
+          path="systemPrompt"
+        >
           <n-input
             v-model:value="formValue.systemPrompt"
             type="textarea"
@@ -74,17 +90,32 @@
             placeholder="你是一个有用的助手..."
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type === 'external'" label="外部地址" path="externalUrl">
-          <n-input v-model:value="formValue.externalUrl" placeholder="例如 http://localhost:18080/a2a 或 /a2a/stream" />
+        <n-form-item
+          v-if="formValue.type === 'external'"
+          label="外部地址"
+          path="externalUrl"
+        >
+          <n-input
+            v-model:value="formValue.externalUrl"
+            placeholder="例如 http://localhost:18080/a2a 或 /a2a/stream"
+          />
         </n-form-item>
-        <n-form-item v-if="formValue.type === 'external'" label="外部类型" path="externalType">
+        <n-form-item
+          v-if="formValue.type === 'external'"
+          label="外部类型"
+          path="externalType"
+        >
           <n-select
             v-model:value="formValue.externalType"
             :options="externalTypeOptions"
             placeholder="选择外部 Agent 类型"
           />
         </n-form-item>
-        <n-form-item v-if="formValue.type === 'external'" label="调用参数(JSON)" path="externalParams">
+        <n-form-item
+          v-if="formValue.type === 'external'"
+          label="调用参数(JSON)"
+          path="externalParams"
+        >
           <n-input
             v-model:value="formValue.externalParams"
             type="textarea"
@@ -164,6 +195,24 @@ const externalTypeOptions = [
 const columns = [
   { title: "名称", key: "name", width: 150 },
   {
+    title: "状态",
+    key: "status",
+    width: 100,
+    render(row) {
+      let type = "default";
+      if (row.status === "online") type = "success";
+      if (row.status === "busy") type = "warning";
+      return h(
+        NTag,
+        {
+          type: type,
+          bordered: false,
+        },
+        { default: () => row.status || "offline" },
+      );
+    },
+  },
+  {
     title: "类型",
     key: "type",
     width: 100,
@@ -174,7 +223,7 @@ const columns = [
           type: row.type === "builtin" ? "primary" : "default",
           bordered: false,
         },
-        { default: () => row.type }
+        { default: () => row.type },
       );
     },
   },
@@ -205,19 +254,31 @@ const columns = [
       const tools = row.tools || [];
       const mcps = row.mcpServers || [];
       if (tools.length === 0 && mcps.length === 0) return "无";
-      
+
       const tags = [];
-      tools.forEach(t => {
-        tags.push(h(NTag, { type: "success", size: "small", bordered: false }, { default: () => t.name }));
+      tools.forEach((t) => {
+        tags.push(
+          h(
+            NTag,
+            { type: "success", size: "small", bordered: false },
+            { default: () => t.name },
+          ),
+        );
       });
-      mcps.forEach(m => {
-        tags.push(h(NTag, { type: "warning", size: "small", bordered: false }, { default: () => `MCP:${m.name}` }));
+      mcps.forEach((m) => {
+        tags.push(
+          h(
+            NTag,
+            { type: "warning", size: "small", bordered: false },
+            { default: () => `MCP:${m.name}` },
+          ),
+        );
       });
 
       return h(
         NSpace,
         { size: 4, style: { flexWrap: "wrap" } },
-        { default: () => tags }
+        { default: () => tags },
       );
     },
   },
@@ -233,7 +294,7 @@ const columns = [
             h(
               NButton,
               { size: "small", onClick: () => handleEdit(row) },
-              { default: () => "编辑" }
+              { default: () => "编辑" },
             ),
           ];
 
@@ -246,8 +307,8 @@ const columns = [
                   type: "error",
                   onClick: () => handleDelete(row),
                 },
-                { default: () => "删除" }
-              )
+                { default: () => "删除" },
+              ),
             );
           }
           return btns;
@@ -282,9 +343,9 @@ async function loadData() {
     const mcpRes = await ListMCPServers();
     if (mcpRes.code === 200) {
       mcpOptions.value = (mcpRes.data || []).map((m) => ({
-        label: `${m.name} (${m.enabled ? '已启用' : '已禁用'})`,
+        label: `${m.name} (${m.enabled ? "已启用" : "已禁用"})`,
         value: m.id,
-        disabled: !m.enabled
+        disabled: !m.enabled,
       }));
     }
 
@@ -385,7 +446,9 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        1 // Default ModeID for now
+        1, // Default ModeID for now
+        formValue.value.status || "offline",
+        formValue.value.capabilities || "",
       );
     } else {
       res = await CreateAgent(
@@ -399,7 +462,9 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        1
+        1,
+        formValue.value.status || "offline",
+        formValue.value.capabilities || "",
       );
     }
 

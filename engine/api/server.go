@@ -1,10 +1,20 @@
 package api
 
 import (
+	"context"
+	"encoding/json"
+	"iat/common/protocol"
 	"iat/engine/api/handler"
+	"iat/engine/internal/orchestrator"
+	"iat/engine/internal/repo"
+	"iat/engine/internal/runtime"
 	"iat/engine/internal/service"
+	"iat/engine/pkg/ai"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 type Server struct {
@@ -22,14 +32,44 @@ func (s *Server) Start() error {
 	projectSvc := service.NewProjectService()
 	indexSvc := service.NewIndexService()
 	mcpSvc := service.NewMCPService()
+	wsHub := service.NewWSHub()
+	go wsHub.Run(context.Background())
+
+	toolSvc := service.NewToolService(mcpSvc)
 	taskSvc := service.NewTaskService(nil)                 // TODO: Handle SSE for tasks
 	subAgentTaskSvc := service.NewSubAgentTaskService(nil) // TODO: Handle SSE for sub-agent tasks
-	chatSvc := service.NewChatService(mcpSvc, taskSvc, subAgentTaskSvc)
+	chatSvc := service.NewChatService(mcpSvc, toolSvc, taskSvc, subAgentTaskSvc, wsHub)
 	sessionSvc := service.NewSessionService()
 	modelSvc := service.NewAIModelService()
 	agentSvc := service.NewAgentService()
-	toolSvc := service.NewToolService()
 	modeSvc := service.NewModeService()
+	registrySvc := service.NewRegistryService()
+	workflowRepo := repo.NewWorkflowRepo()
+
+	// Initialize Runtime
+	rt := runtime.NewRuntime(chatSvc, registrySvc, toolSvc)
+
+	// Initialize Orchestrator components
+	// Note: Planner and Reviewer will be created dynamically in ChatService for now 
+	// because they need session-specific AI clients.
+	router := orchestrator.NewRouter(registrySvc)
+	executor := orchestrator.NewExecutionEngine(rt, router, nil, workflowRepo) // Reviewer can be nil or set later
+	executor.SetStatusCallback(func(taskId string, status string, output any) {
+		wsHub.Broadcast(protocol.Message{
+			Type:   protocol.MsgNotification,
+			Action: "task_status",
+			Payload: map[string]any{
+				"taskId": taskId,
+				"status": status,
+				"output": output,
+			},
+			Timestamp: time.Now().UnixMilli(),
+		})
+	})
+	chatSvc.SetExecutor(executor)
+	chatSvc.SetPlannerFactory(func(client *ai.AIClient) service.TaskPlanner {
+		return orchestrator.NewPlanner(client)
+	})
 
 	// Initialize Handlers
 	projectHandler := handler.NewProjectHandler(projectSvc, indexSvc)
@@ -42,9 +82,42 @@ func (s *Server) Start() error {
 	modeHandler := handler.NewModeHandler(modeSvc)
 	subAgentTaskHandler := handler.NewSubAgentTaskHandler(subAgentTaskSvc)
 	runtimeTestHandler := handler.NewRuntimeTestHandler()
+	registryHandler := handler.NewRegistryHandler(registrySvc)
+
+	// Start registry cleanup goroutine
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		for range ticker.C {
+			registrySvc.Cleanup()
+		}
+	}()
 
 	// CORS middleware
 	handler := corsMiddleware(mux)
+
+	// WebSocket Endpoint
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	mux.HandleFunc("/api/ws", func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		clientID := r.URL.Query().Get("id")
+		if clientID == "" {
+			clientID = "browser_" + time.Now().Format("150405")
+		}
+		client := &service.Client{
+			ID:   clientID,
+			Conn: conn,
+			Send: make(chan protocol.Message, 256),
+		}
+		wsHub.Register(client)
+		go client.WritePump()
+		go client.ReadPump(wsHub)
+	})
+
 	// Sub-Agent Tasks
 	mux.HandleFunc("/api/subagent-tasks", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -271,6 +344,41 @@ func (s *Server) Start() error {
 
 	// Chat Stream
 	mux.HandleFunc("/api/chat/stream", chatHandler.Stream)
+
+	// Registry
+	mux.HandleFunc("/api/registry/register", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			registryHandler.Register(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/registry/heartbeat/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			registryHandler.Heartbeat(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/registry/discover", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			registryHandler.Discover(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/registry/tools", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			tools, err := mcpSvc.ListAllTools(r.Context())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			json.NewEncoder(w).Encode(tools)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
 
 	return http.ListenAndServe(s.addr, handler)
 }
