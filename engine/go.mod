@@ -4,12 +4,11 @@ go 1.24
 
 require (
 	github.com/cloudwego/eino v0.7.24
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.8
-	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd
+	github.com/dop251/goja v0.0.0-20260106131823-651366fbe6e3
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/mark3labs/mcp-go v0.43.2
-	github.com/sergi/go-diff v1.3.1
 	github.com/syndtr/goleveldb v1.0.0
 	gorm.io/gorm v1.25.12
 	iat/common v0.0.0-00010101000000-000000000000
@@ -22,6 +21,7 @@ require (
 	github.com/bytedance/sonic v1.14.1 // indirect
 	github.com/bytedance/sonic/loader v0.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
+	github.com/cloudwego/eino-ext/components/model/openai v0.1.8 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.13 // indirect
 	github.com/dlclark/regexp2 v1.11.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -47,6 +47,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/slongfield/pyfmt v0.0.0-20220222012616-ea85ff4c361f // indirect
 	github.com/spf13/cast v1.7.1 // indirect

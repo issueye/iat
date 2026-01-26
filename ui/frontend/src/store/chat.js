@@ -14,7 +14,7 @@ export const useChatStore = defineStore('chat', {
     ws: null
   }),
   getters: {
-    currentSession: (state) => state.sessions.find(s => s.ID === state.currentSessionId)
+    currentSession: (state) => state.sessions.find(s => s.id === state.currentSessionId)
   },
   actions: {
     initWS() {
@@ -31,10 +31,10 @@ export const useChatStore = defineStore('chat', {
         debugStore.addLog(msg.action || msg.type, msg.payload || msg)
       })
     },
-    async fetchSessions() {
+    async fetchSessions(projectId) {
       try {
-        const res = await getSessions()
-        this.sessions = res.data || []
+        const res = await getSessions(projectId)
+        this.sessions = res || []
       } catch (error) {
         console.error('Failed to fetch sessions:', error)
       }
@@ -43,7 +43,7 @@ export const useChatStore = defineStore('chat', {
       this.loading = true
       try {
         const res = await getMessages(sessionId)
-        this.messages = res.data || []
+        this.messages = res || []
         this.currentSessionId = sessionId
       } catch (error) {
         console.error('Failed to fetch messages:', error)
@@ -61,7 +61,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
     addMessage(msg) {
-      this.messages.push(msg)
+      return this.messages.push(msg)
     },
     updateLastMessage(content) {
       if (this.messages.length > 0) {

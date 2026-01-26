@@ -11,16 +11,25 @@ const md = new MarkdownIt({
     if (lang && hljs.getLanguage(lang)) {
       try {
         const highlighted = hljs.highlight(str, { language: lang, ignoreIllegals: true }).value;
+        const encodedCode = encodeURIComponent(str);
         return `<div class="code-block-wrapper">
                   <div class="code-block-header">
                     <span class="code-lang">${lang}</span>
+                    <span class="copy-btn" data-code="${encodedCode}">复制</span>
                   </div>
                   <pre class="hljs"><code>${highlighted}</code></pre>
                 </div>`;
       } catch (__) {}
     }
 
-    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
+    const encodedCode = encodeURIComponent(str);
+    return `<div class="code-block-wrapper">
+              <div class="code-block-header">
+                <span class="code-lang">text</span>
+                <span class="copy-btn" data-code="${encodedCode}">复制</span>
+              </div>
+              <pre class="hljs"><code>${md.utils.escapeHtml(str)}</code></pre>
+            </div>`;
   }
 })
 

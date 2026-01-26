@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { computed } from "vue";
 import {
   NCard,
@@ -20,28 +20,16 @@ import {
 } from "@vicons/ionicons5";
 import Thinking from "./Thinking.vue";
 
-interface SubAgentTask {
-  taskId: string;
-  agentName: string;
-  query: string;
-  status: "pending" | "running" | "completed" | "failed" | "aborted";
-  depth: number;
-  result?: string;
-  error?: string;
-  chunks: string[];
-  children: SubAgentTask[];
-}
-
 const ThinkTags = {
   Open: "<think>",
   Close: "</think>",
 };
 
-const props = defineProps<SubAgentTask>();
+const props = defineProps();
 
 const emit = defineEmits(["abort"]);
 
-function parseThinkContent(text: string) {
+function parseThinkContent(text) {
   const raw = String(text || "");
   const thinkOpenTag = ThinkTags.Open;
   const thinkCloseTag = ThinkTags.Close;
@@ -250,58 +238,73 @@ const handleAbort = () => {
 
 <style scoped>
 .sub-agent-card-wrapper {
-  margin-top: 12px;
-  margin-bottom: 12px;
+  margin-top: 16px;
+  margin-bottom: 16px;
 }
 
 .sub-agent-card {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-  background-color: #fafafa;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
+  border-radius: 12px !important;
+  transition: transform 0.2s;
+}
+
+.sub-agent-card:hover {
+  transform: translateY(-2px);
 }
 
 .agent-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
+  color: #212529;
 }
 
 .task-query {
   font-size: 13px;
-  color: #666;
-  margin-bottom: 8px;
-  padding: 4px 8px;
-  background: #f0f0f0;
-  border-radius: 4px;
+  color: #495057;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  line-height: 1.5;
 }
 
 .task-details {
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .thought-content,
 .result-content {
   font-size: 13px;
   line-height: 1.6;
+  color: #495057;
 }
 
 .empty-text {
-  color: #999;
+  color: #adb5bd;
   font-style: italic;
+  font-size: 12px;
 }
 
 .error-text {
-  color: #f5222d;
+  color: #fa5252;
   white-space: pre-wrap;
+  background: #fff5f5;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #ffe3e3;
 }
 
 .running-text {
   font-size: 12px;
-  color: #1890ff;
+  color: #228be6;
+  font-weight: 500;
 }
 
 .nested-tasks {
-  margin-top: 12px;
-  border-top: 1px dashed #eee;
-  padding-top: 12px;
+  margin-top: 16px;
+  border-top: 1px dashed #e9ecef;
+  padding-top: 16px;
 }
 
 .spin-animation {
@@ -318,10 +321,17 @@ const handleAbort = () => {
 }
 
 :deep(.n-card-header) {
-  padding: 8px 12px !important;
+  padding: 12px 16px !important;
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 :deep(.n-card__content) {
-  padding: 8px 12px !important;
+  padding: 16px !important;
+}
+
+:deep(.n-collapse-item__header) {
+  font-size: 13px !important;
+  font-weight: 500 !important;
 }
 </style>

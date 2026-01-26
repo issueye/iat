@@ -8,14 +8,14 @@ export const useProjectStore = defineStore('project', {
     loading: false
   }),
   getters: {
-    currentProject: (state) => state.projects.find(p => p.ID === state.currentProjectId)
+    currentProject: (state) => state.projects.find(p => p.id === state.currentProjectId)
   },
   actions: {
     async fetchProjects() {
       this.loading = true
       try {
         const res = await getProjects()
-        this.projects = res.data || []
+        this.projects = res || []
       } catch (error) {
         console.error('Failed to fetch projects:', error)
       } finally {

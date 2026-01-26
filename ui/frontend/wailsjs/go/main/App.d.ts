@@ -5,7 +5,7 @@ import {result} from '../models';
 
 export function CreateAIModel(arg1:model.AIModel):Promise<result.Result>;
 
-export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:number,arg9:Array<number>,arg10:Array<number>,arg11:number):Promise<result.Result>;
+export function CreateAgent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:number,arg9:Array<number>,arg10:Array<number>,arg11:number,arg12:string,arg13:string):Promise<result.Result>;
 
 export function CreateMCPServer(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string):Promise<result.Result>;
 
@@ -55,7 +55,7 @@ export function SelectDirectory():Promise<result.Result>;
 
 export function TestAIModel(arg1:model.AIModel):Promise<result.Result>;
 
-export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:number,arg10:Array<number>,arg11:Array<number>,arg12:number):Promise<result.Result>;
+export function UpdateAgent(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:number,arg10:Array<number>,arg11:Array<number>,arg12:number,arg13:string,arg14:string):Promise<result.Result>;
 
 export function UpdateMCPServer(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:boolean):Promise<result.Result>;
 

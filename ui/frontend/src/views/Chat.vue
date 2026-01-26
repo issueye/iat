@@ -114,72 +114,27 @@
           :bubble-props="{ showTime: true }"
         >
           <template #avatar="{ item }">
-            <n-avatar size="medium">
-              {{ item.role === "用户" ? "user" : "智能体" }}
+            <n-avatar
+              size="medium"
+              round
+              :color="item.role === 'user' ? '#e7f5ff' : '#f3f0ff'"
+              :text-color="item.role === 'user' ? '#228be6' : '#7950f2'"
+            >
+              {{ item.role === "user" ? "U" : "AI" }}
             </n-avatar>
           </template>
           <template #header="{ item }">
-            <div class="message-header">
-              <span>{{ item.role === "user" ? "用户" : "智能体" }}</span>
-              <span class="message-time">{{ formatTime(item.createdAt) }}</span>
-            </div>
+            <ChatItemHeader :item="item" />
           </template>
           <template #content="{ item }">
-            <div v-if="item.type === 'tool'" class="tool-call-bubble">
-              <div class="tool-header">
-                <n-icon><ContractOutline /></n-icon>
-                <span>工具调用: {{ item.toolName }}</span>
-              </div>
-              <pre class="tool-args">{{ item.toolArguments }}</pre>
-            </div>
-            <div v-else>
-              <Thinking
-                v-if="
-                  parseThinkContent(item.content).think ||
-                  parseThinkContent(item.content).isThinkingOpen
-                "
-                :content="parseThinkContent(item.content).think"
-              />
-              <XMarkdown
-                v-if="parseThinkContent(item.content).answer"
-                :markdown="parseThinkContent(item.content).answer"
-                default-theme-mode="light"
-                style="text-align: left; margin-top: 8px"
-                :code-x-props="{ enableCodeLineNumber: true }"
-              />
-              <!-- Sub-Agent Tasks -->
-              <div
-                v-if="getTasksByMessage(item).length > 0"
-                class="sub-agent-tasks-container"
-              >
-                <SubAgentCard
-                  v-for="task in getTasksByMessage(item)"
-                  :key="task.taskId"
-                  v-bind="task"
-                  @abort="handleAbortSubAgent"
-                />
-              </div>
-            </div>
+            <ChatItemContent
+              :item="item"
+              :messages="messages"
+              :taskMap="subAgentTaskMap"
+            />
           </template>
           <template #footer="{ item }">
-            <div class="message-footer">
-              <n-button text color="#8a2be2" @click="showPromptModalFn(item)">
-                {{ item.type === "tool" ? "输出" : "输入" }}
-              </n-button>
-              <n-button
-                text
-                size="tiny"
-                style="margin-left: 8px"
-                @click="showDebugDrawer = true"
-              >
-                调试
-              </n-button>
-
-              <!-- token -->
-              <span class="token-usage" v-if="item.type !== 'tool'">
-                TOKEN {{ item.tokenUsage }}
-              </span>
-            </div>
+            <ChatItemFooter :item="item" />
           </template>
         </BubbleList>
 
@@ -227,50 +182,6 @@
         autofocus
       />
     </n-modal>
-    <!-- Prompt Modal -->
-    <n-modal
-      v-model:show="showPromptModal"
-      preset="dialog"
-      :title="
-        viewType === 'diff'
-          ? '文件差异'
-          : viewType === 'tree'
-            ? '文件目录'
-            : '详细信息'
-      "
-      style="width: 80%"
-    >
-      <div style="max-height: 80vh; overflow: auto">
-        <ResultRenderer
-          :content="currentViewPrompt"
-          :type="viewType"
-          :metadata="viewMetadata"
-        />
-      </div>
-    </n-modal>
-
-    <!-- Debug Console Drawer -->
-    <n-drawer v-model:show="showDebugDrawer" :width="500" placement="right">
-      <n-drawer-content title="系统调试日志" closable>
-        <template #header-extra>
-          <n-button size="tiny" secondary @click="debugStore.clear()"
-            >清空</n-button
-          >
-        </template>
-        <div class="debug-logs">
-          <div v-for="log in logs" :key="log.id" class="log-item">
-            <div class="log-meta">
-              <span class="log-time">{{ log.time }}</span>
-              <n-tag size="small" :bordered="false" type="info">{{
-                log.type
-              }}</n-tag>
-            </div>
-            <pre class="log-data">{{ log.data }}</pre>
-          </div>
-          <div v-if="logs.length === 0" class="empty-logs">暂无实时日志</div>
-        </div>
-      </n-drawer-content>
-    </n-drawer>
   </div>
 </template>
 
@@ -292,11 +203,7 @@ import {
 } from "naive-ui";
 import {
   TrashOutline,
-  ArchiveOutline,
-  ContractOutline,
   InformationCircleOutline,
-  ChevronForwardOutline,
-  ChevronDownOutline,
   StopCircleOutline,
 } from "@vicons/ionicons5";
 import { api } from "../api";
@@ -304,11 +211,11 @@ import { useAgentStore } from "../store/agent";
 import { useChatStore } from "../store/chat";
 import { useProjectStore } from "../store/project";
 import { useWorkflowStore } from "../store/workflow";
-import { useDebugStore } from "../store/debug";
-import SubAgentCard from "../components/SubAgentCard.vue";
-import Thinking from "../components/Thinking.vue";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas.vue";
-import ResultRenderer from "../components/renderers/ResultRenderer.vue";
+import ChatItemHeader from "./components/ChatItemHeader.vue";
+import ChatItemFooter from "./components/ChatItemFooter.vue";
+import ChatItemContent from "./components/ChatItemContent.vue";
+
 import {
   ChatModes,
   ChatRoles,
@@ -327,14 +234,11 @@ const agentStore = useAgentStore();
 const chatStore = useChatStore();
 const projectStore = useProjectStore();
 const workflowStore = useWorkflowStore();
-const debugStore = useDebugStore();
 
 // State from stores
 const projects = computed(() => projectStore.projects);
 const sessions = computed(() => chatStore.sessions);
 const agents = computed(() => agentStore.agents);
-const logs = computed(() => debugStore.logs);
-const showDebugDrawer = ref(false);
 const currentProjectId = computed({
   get: () => projectStore.currentProjectId,
   set: (val) => projectStore.setCurrentProject(val),
@@ -359,36 +263,6 @@ const currentWorkflowTasks = computed(() => workflowStore.tasks);
 // Sub-Agent Tasks State
 const subAgentTaskMap = ref(new Map());
 
-function getTasksByMessage(msg) {
-  const idx = messages.value.indexOf(msg);
-  if (idx === -1) return [];
-  return Array.from(subAgentTaskMap.value.values()).filter(
-    (t) => t.messageIndex === idx && !t.parentTaskId,
-  );
-}
-
-async function handleAbortSubAgent(taskId) {
-  try {
-    await api.abortSubAgentTask(taskId);
-    message.success("子任务中止请求已发送");
-  } catch (e) {
-    message.error("中止失败: " + e.message);
-  }
-}
-
-// Computed properties
-const lastAssistantMessage = computed(() => {
-  for (let i = messages.value.length - 1; i >= 0; i--) {
-    if (messages.value[i]?.role === ChatRoles.Assistant)
-      return messages.value[i];
-  }
-  return null;
-});
-
-const formatTime = (time) => {
-  return new Date(time).toLocaleTimeString();
-};
-
 const modeOptions = [
   { label: "对话 (Chat)", value: ChatModes.Chat },
   { label: "计划 (Plan)", value: ChatModes.Plan },
@@ -398,17 +272,8 @@ const modeOptions = [
 // UI State
 const showCreateModal = ref(false);
 const newSessionName = ref("");
-const selectedMode = ref(ChatModes.Chat);
-const selectedAgentId = ref(null);
-const showDetailModal = ref(false);
-const showPromptModal = ref(false);
-const currentViewPrompt = ref("");
-const viewType = ref("text");
-const viewMetadata = ref({});
-const toolInvocations = ref([]);
 const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
-const searchingSessions = ref(false);
 
 const projectOptions = computed(() => {
   return projects.value.map((p) => ({
@@ -424,122 +289,6 @@ const agentOptions = computed(() => {
   }));
 });
 
-const showPromptModalFn = (item) => {
-  viewType.value = "text";
-  viewMetadata.value = {};
-
-  switch (item.type) {
-    case "tool":
-      {
-        currentViewPrompt.value = item.toolOutput || "";
-        const toolName = item.toolName;
-
-        if (toolName === "list_files") {
-          viewType.value = "tree";
-        } else if (toolName === "diff_file") {
-          viewType.value = "diff";
-          viewMetadata.value = { language: "diff" };
-        } else if (toolName === "read_file" || toolName === "read_file_range") {
-          viewType.value = "code";
-          // Try to get language from path in arguments
-          try {
-            const args = JSON.parse(item.toolArguments || "{}");
-            const path = args.path || "";
-            const ext = path.split(".").pop();
-            viewMetadata.value = { path, language: ext };
-          } catch (e) {}
-        } else {
-          // Check if it's JSON
-          try {
-            JSON.parse(currentViewPrompt.value);
-            viewType.value = "code";
-            viewMetadata.value = { language: "json" };
-          } catch (e) {}
-        }
-      }
-      break;
-    case "message":
-      {
-        currentViewPrompt.value = item.prompt || "";
-        if (currentViewPrompt.value) {
-          try {
-            const parsed = JSON.parse(currentViewPrompt.value);
-            currentViewPrompt.value = JSON.stringify(parsed, null, 2);
-            viewType.value = "code";
-            viewMetadata.value = { language: "json" };
-          } catch (e) {}
-        }
-      }
-      break;
-  }
-
-  showPromptModal.value = true;
-};
-
-// Helper Functions
-function parseThinkContent(text) {
-  const raw = String(text || "");
-  const thinkOpenTag = ThinkTags.Open;
-  const thinkCloseTag = ThinkTags.Close;
-  let i = 0;
-  let inThink = false;
-  let answer = "";
-  let think = "";
-
-  while (i < raw.length) {
-    const openAt = raw.indexOf(thinkOpenTag, i);
-    const closeAt = raw.indexOf(thinkCloseTag, i);
-
-    const nextAt =
-      openAt === -1
-        ? closeAt
-        : closeAt === -1
-          ? openAt
-          : Math.min(openAt, closeAt);
-
-    if (nextAt === -1) {
-      const chunk = raw.slice(i);
-      if (inThink) think += chunk;
-      else answer += chunk;
-      break;
-    }
-
-    const chunk = raw.slice(i, nextAt);
-    if (inThink) think += chunk;
-    else answer += chunk;
-
-    if (nextAt === openAt) {
-      inThink = true;
-      i = nextAt + thinkOpenTag.length;
-    } else {
-      inThink = false;
-      i = nextAt + thinkCloseTag.length;
-    }
-  }
-
-  return {
-    think: think.trim(),
-    answer: answer.trim(),
-    isThinkingOpen: inThink,
-  };
-}
-
-function getThinkingStatus(item) {
-  if (item !== lastAssistantMessage.value) return ThinkingStatuses.End;
-  if (generationStatus.value === ThinkingStatuses.Cancel)
-    return ThinkingStatuses.Cancel;
-  if (generationStatus.value === ThinkingStatuses.Error)
-    return ThinkingStatuses.Error;
-  const parsed = parseThinkContent(item?.content);
-  if (isGenerating.value) {
-    if (parsed.isThinkingOpen) {
-      return parsed.think ? ThinkingStatuses.Thinking : ThinkingStatuses.Start;
-    }
-    return ThinkingStatuses.End;
-  }
-  return ThinkingStatuses.End;
-}
-
 const isSearchingSessions = computed(() => {
   return String(sessionSearchQuery.value || "").trim() !== "";
 });
@@ -547,9 +296,6 @@ const isSearchingSessions = computed(() => {
 const displaySessions = computed(() => {
   return isSearchingSessions.value ? searchedSessions.value : sessions.value;
 });
-
-// Event Source
-let eventSource = null;
 
 watch(currentProjectId, (newVal) => {
   if (newVal) {
@@ -676,7 +422,9 @@ async function handleSend(val) {
     }
   } catch (e) {
     message.error("发送失败: " + e.message);
-    chatStore.messages[aiMsgIndex].content = "[Error: " + e.message + "]";
+    if (chatStore.messages[aiMsgIndex]) {
+      chatStore.messages[aiMsgIndex].content = "[Error: " + e.message + "]";
+    }
     generationStatus.value = ThinkingStatuses.Error;
   } finally {
     chatStore.setStreaming(false);
@@ -685,8 +433,11 @@ async function handleSend(val) {
 }
 
 function handleSSEEvent(data, aiMsgIndex) {
+  const msg = chatStore.messages[aiMsgIndex];
+  if (!msg) return;
+
   if (data.type === "chunk") {
-    chatStore.messages[aiMsgIndex].content += data.content;
+    msg.content += data.content || "";
   } else if (data.type === "workflow_start") {
     const { goal, tasks } = data.extra || {};
     workflowStore.tasks = (tasks || []).map((t) => ({
@@ -777,107 +528,117 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.debug-logs {
-  font-family: "Fira Code", monospace;
-  font-size: 11px;
-}
-.log-item {
-  margin-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 8px;
-}
-.log-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
-}
-.log-time {
-  color: #999;
-}
-.log-data {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #444;
-  background: #f9f9f9;
-  padding: 4px;
-  border-radius: 2px;
-}
-.empty-logs {
-  text-align: center;
-  color: #ccc;
-  padding: 40px 0;
+:deep(.el-bubble-content-wrapper .el-bubble-footer) {
+  margin-top: 4px;
 }
 
 .chat-container {
   display: flex;
   height: 100%;
-  background-color: #fff;
+  background-color: #f8f9fa;
+  overflow: hidden;
 }
 
+/* Sidebar Styling */
 .chat-sidebar {
-  width: 260px;
-  border-right: 1px solid #eee;
+  width: 300px;
+  background-color: #ffffff;
+  border-right: 1px solid #e9ecef;
   display: flex;
   flex-direction: column;
-  padding: 10px;
+  transition: all 0.3s;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.02);
 }
 
 .sidebar-header {
-  margin-bottom: 10px;
+  padding: 20px 16px;
+  border-bottom: 1px solid #f1f3f5;
 }
 
 .session-search {
-  margin-bottom: 10px;
+  padding: 12px 16px;
 }
 
 .session-list {
   flex: 1;
   overflow-y: auto;
+  padding: 8px;
+}
+
+.session-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.session-list::-webkit-scrollbar-thumb {
+  background: #dee2e6;
+  border-radius: 4px;
 }
 
 .session-item {
-  padding: 8px;
+  padding: 12px 16px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 10px;
   margin-bottom: 4px;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .session-item:hover {
-  background-color: #f5f5f5;
+  background-color: #f1f3f5;
 }
 
 .session-item.active {
-  background-color: #e6f7ff;
-  color: #1890ff;
+  background-color: #e7f5ff;
+  border-color: #a5d8ff;
 }
 
 .session-name {
+  font-size: 14px;
   font-weight: 500;
+  color: #212529;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .session-time {
-  font-size: 12px;
-  color: #999;
+  font-size: 11px;
+  color: #adb5bd;
+  margin-top: 4px;
 }
 
+.empty-sessions {
+  text-align: center;
+  color: #adb5bd;
+  padding: 40px 0;
+  font-size: 13px;
+}
+
+/* Main Content Styling */
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 10px;
-  width: calc(100% - 260px);
+  background-color: #ffffff;
+  position: relative;
 }
 
 .chat-header-bar {
+  height: 60px;
+  padding: 0 24px;
   display: flex;
-  justify-content: flex-end;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #eee;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e9ecef;
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-main-content {
@@ -885,113 +646,33 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  gap: 10px;
-}
-
-.header-controls {
-  display: flex;
-  gap: 10px;
+  position: relative;
 }
 
 .messages-area {
   flex: 1;
+  padding: 24px;
   overflow-y: auto;
-  padding: 0; /* BubbleList handles padding */
-  background-color: transparent; /* BubbleList handles background */
-  margin-bottom: 0;
-}
-
-.message-item {
-  margin-bottom: 16px;
-}
-
-.message-role {
-  margin-bottom: 4px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.message-time {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #ccc;
-}
-
-.content-pre {
-  white-space: pre-wrap;
-  word-break: break-word;
-  background-color: #fff;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid #eee;
-  font-family: inherit;
-  margin: 0;
 }
 
 .input-area {
-  width: 100%;
-  display: flex;
-  gap: 10px;
+  padding: 20px 24px 30px;
+  background: linear-gradient(to top, #ffffff 80%, rgba(255, 255, 255, 0));
 }
 
-:deep(.el-sender-wrap) {
-  width: calc(100% - 100px);
-}
-
-.send-btn {
-  height: auto;
-}
-
-.tool-pre {
-  margin: 0;
-  padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: monospace;
-  font-size: 12px;
-}
-
-.tool-call-bubble {
-  background-color: #f0f0f0;
-  border-radius: 8px;
-  padding: 8px;
-  border-left: 4px solid #1890ff;
-}
-
-.message-footer {
-  display: flex;
-  gap: 8px;
-}
-
-.token-usage {
-  font-size: 12px;
-  color: #999;
-}
-
-:deep(.el-bubble-content) {
-  --bubble-content-max-width: 100% !important;
-}
-
-.tool-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* Bubble Overrides */
+:deep(.n-avatar) {
+  background-color: #e7f5ff;
+  color: #228be6;
   font-weight: bold;
-  font-size: 12px;
-  color: #666;
-  margin-bottom: 4px;
 }
 
-.tool-args {
-  margin: 0;
-  font-size: 11px;
-  color: #333;
-  background: #fff;
-  padding: 4px;
-  border-radius: 4px;
-  overflow: auto;
+:deep(.bubble-list-item) {
+  margin-bottom: 24px !important;
+}
+
+/* Sender Override */
+:deep(.n-input) {
+  border-radius: 12px;
 }
 </style>

@@ -9,14 +9,14 @@ export const useWorkflowStore = defineStore('workflow', {
     loading: false
   }),
   getters: {
-    currentWorkflow: (state) => state.workflows.find(w => w.ID === state.currentWorkflowId)
+    currentWorkflow: (state) => state.workflows.find(w => w.id === state.currentWorkflowId)
   },
   actions: {
     async fetchWorkflows(sessionId) {
       this.loading = true
       try {
         const res = await getWorkflows(sessionId)
-        this.workflows = res.data || []
+        this.workflows = res || []
       } catch (error) {
         console.error('Failed to fetch workflows:', error)
       } finally {
@@ -27,7 +27,7 @@ export const useWorkflowStore = defineStore('workflow', {
       this.loading = true
       try {
         const res = await getWorkflowTasks(workflowId)
-        this.tasks = res.data || []
+        this.tasks = res || []
         this.currentWorkflowId = workflowId
       } catch (error) {
         console.error('Failed to fetch tasks:', error)

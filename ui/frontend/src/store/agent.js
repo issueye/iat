@@ -18,9 +18,9 @@ export const useAgentStore = defineStore('agent', {
           getModels(),
           getModes()
         ])
-        this.agents = agentsRes.data || []
-        this.models = modelsRes.data || []
-        this.modes = modesRes.data || []
+        this.agents = agentsRes || []
+        this.models = modelsRes || []
+        this.modes = modesRes || []
       } catch (error) {
         console.error('Failed to fetch agent data:', error)
       } finally {

@@ -29,6 +29,16 @@ export const ThinkTags = {
   Close: "</think>",
 };
 
+export const RoleTypes = {
+  tool: { type: "tool", title: "工具调用" },
+  assistant: { type: "assistant", title: "智能体" },
+  user: { type: "user", title: "用户" },
+};
+
 export const SSE = {
   EventsUrl: "http://localhost:8080/api/chat/stream",
+};
+
+export default {
+  ...RoleTypes,
 };

@@ -1,25 +1,24 @@
 <template>
   <div class="result-renderer">
     <!-- Code Diff -->
-    <CodeDiff 
-      v-if="type === 'diff'" 
-      :diff="content" 
+    <CodeDiff
+      v-if="type === 'diff'"
+      :diff="content"
       :file-name="metadata?.path"
       :language="metadata?.language"
     />
 
     <!-- File Tree -->
-    <FileTree 
-      v-else-if="type === 'tree'" 
-      :files="parsedFiles" 
-    />
+    <FileTree v-else-if="type === 'tree'" :files="parsedFiles" />
 
     <!-- JSON / Code Block -->
     <div v-else-if="type === 'code'" class="code-block">
       <div class="code-header" v-if="metadata?.title">
         <span>{{ metadata.title }}</span>
       </div>
-      <pre v-highlight><code :class="metadata?.language">{{ content }}</code></pre>
+      <pre
+        v-highlight
+      ><code :class="metadata?.language">{{ content }}</code></pre>
     </div>
 
     <!-- Default Markdown -->
@@ -28,48 +27,50 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import CodeDiff from './CodeDiff.vue'
-import FileTree from './FileTree.vue'
-import MarkdownIt from 'markdown-it'
-
-const md = new MarkdownIt()
+import { computed } from "vue";
+import CodeDiff from "./CodeDiff.vue";
+import FileTree from "./FileTree.vue";
+import { renderMarkdown } from "../../utils/markdown";
 
 const props = defineProps({
   type: {
     type: String,
-    default: 'text' // diff, tree, code, text
+    default: "text", // diff, tree, code, text
   },
   content: {
     type: [String, Object, Array],
-    required: true
+    required: true,
   },
   metadata: {
     type: Object,
-    default: () => ({})
-  }
-})
+    default: () => ({}),
+  },
+});
 
 const renderedMarkdown = computed(() => {
-  if (typeof props.content !== 'string') return JSON.stringify(props.content, null, 2)
-  return md.render(props.content)
-})
+  if (typeof props.content !== "string")
+    return JSON.stringify(props.content, null, 2);
+  return renderMarkdown(props.content);
+});
 
 const parsedFiles = computed(() => {
-  if (Array.isArray(props.content)) return props.content
-  if (typeof props.content === 'string') {
+  if (Array.isArray(props.content)) return props.content;
+  if (typeof props.content === "string") {
     try {
-      return JSON.parse(props.content)
+      return JSON.parse(props.content);
     } catch (e) {
       // Fallback for newline separated paths
-      return props.content.split('\n').filter(p => p.trim()).map(p => ({
-        path: p.trim(),
-        type: p.endsWith('/') || p.endsWith('\\') ? 'dir' : 'file'
-      }))
+      return props.content
+        .split("\n")
+        .filter((p) => p.trim())
+        .map((p) => ({
+          path: p.trim(),
+          type: p.endsWith("/") || p.endsWith("\\") ? "dir" : "file",
+        }));
     }
   }
-  return []
-})
+  return [];
+});
 </script>
 
 <style scoped>
