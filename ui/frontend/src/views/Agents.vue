@@ -48,7 +48,8 @@
           path="modeId"
         >
           <n-select
-            v-model:value="formValue.modeId"
+            v-model:value="formValue.modeIds"
+            multiple
             :options="modeOptions"
             placeholder="选择关联模式"
             clearable
@@ -182,7 +183,7 @@ const formValue = ref({
   systemPrompt: "",
   type: "custom",
   modelId: null,
-  modeId: null,
+  modeIds: [],
   toolIds: [],
   mcpServerIds: [],
   externalUrl: "",
@@ -259,6 +260,23 @@ const columns = [
       return row.Model
         ? h(NTag, { type: "info" }, { default: () => row.Model.name })
         : "无";
+    },
+  },
+  {
+    title: "模式",
+    key: "Mode",
+    width: 200,
+    render(row) {
+      const modes = row.modes || [];
+      if (modes.length === 0) return "无";
+      const tags = modes.map((m) =>
+        h(
+          NTag,
+          { type: "success", bordered: false, size: "small" },
+          { default: () => m.name },
+        ),
+      );
+      return h(NSpace, { size: 4 }, { default: () => tags });
     },
   },
   {
@@ -396,7 +414,7 @@ function handleEdit(row) {
     systemPrompt: row.systemPrompt,
     type: row.type || "custom",
     modelId: row.modelId,
-    modeId: row.modeId,
+    modeIds: (row.modes || []).map((m) => m.id),
     toolIds: (row.tools || []).map((t) => t.id),
     mcpServerIds: (row.mcpServers || []).map((m) => m.id),
     externalUrl: row.externalUrl || "",
@@ -436,7 +454,7 @@ function closeModal() {
     systemPrompt: "",
     type: "custom",
     modelId: null,
-    modeId: null,
+    modeIds: [],
     toolIds: [],
     mcpServerIds: [],
     externalUrl: "",
@@ -458,7 +476,7 @@ async function handleSubmit() {
     let res;
     const modelId = formValue.value.modelId || 0;
     const type = formValue.value.type || "custom";
-    const modeId = formValue.value.modeId || 1;
+    const modeIds = formValue.value.modeIds || [];
 
     if (isEdit.value) {
       res = await UpdateAgent(
@@ -473,7 +491,7 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        modeId,
+        modeIds,
         formValue.value.status || "offline",
         formValue.value.capabilities || "",
       );
@@ -489,7 +507,7 @@ async function handleSubmit() {
         modelId,
         formValue.value.toolIds,
         formValue.value.mcpServerIds,
-        modeId,
+        modeIds,
         formValue.value.status || "offline",
         formValue.value.capabilities || "",
       );

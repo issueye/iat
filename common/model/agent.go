@@ -6,8 +6,7 @@ type Agent struct {
 	Description  string `json:"description"`
 	SystemPrompt string `json:"systemPrompt"`
 	Type         string `json:"type"`
-	ModeID       uint   `json:"modeId"`
-	Mode         Mode   `json:"mode"`
+	Modes        []Mode `json:"modes" gorm:"many2many:agent_modes;"`
 	ModelID      uint   `json:"modelId"`
 	Model        AIModel `json:"-"`
 	Tools        []Tool  `json:"tools" gorm:"many2many:agent_tools;"`

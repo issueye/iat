@@ -21,7 +21,10 @@ func (h *ChatServiceAgentHandler) Handle(ctx context.Context, r *Runtime, inst *
 		return protocol.Message{}, err
 	}
 
-	modeKey := inst.ModelAgent.Mode.Key
+	modeKey := ""
+	if len(inst.ModelAgent.Modes) > 0 {
+		modeKey = inst.ModelAgent.Modes[0].Key
+	}
 	if modeKey == "" {
 		modeKey = "chat"
 	}

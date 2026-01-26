@@ -30,12 +30,12 @@ func (h *RuntimeTestHandler) Run(w http.ResponseWriter, r *http.Request) {
 	a := rt.RegisterDetachedAgent(model.Agent{
 		Base: model.Base{ID: 1},
 		Name: "test_orchestrator",
-		Mode: model.Mode{Key: "chat"},
+		Modes: []model.Mode{{Key: "chat"}},
 	}, &runtime.TestSeparatedAgentHandler{})
 	b := rt.RegisterDetachedAgent(model.Agent{
 		Base: model.Base{ID: 2},
 		Name: "test_worker",
-		Mode: model.Mode{Key: "chat"},
+		Modes: []model.Mode{{Key: "chat"}},
 	}, &runtime.TestSeparatedAgentHandler{})
 
 	_ = rt.GrantTool(a.ID, b.ID, "uppercase")

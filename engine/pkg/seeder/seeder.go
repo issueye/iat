@@ -99,49 +99,49 @@ func seedBuiltinAgents(db *gorm.DB) {
 			Description:  "Analyzes requirements and defines product features (PRD).",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptProductManager,
-			ModeID:       planMode.ID, // PM fits well in Plan mode
+			Modes:        []model.Mode{planMode}, // PM fits well in Plan mode
 		},
 		{
 			Name:         consts.AgentNameProjectManager,
 			Description:  "Plans execution, manages timelines, and coordinates tasks.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptProjectManager,
-			ModeID:       planMode.ID, // Project Manager fits well in Plan mode
+			Modes:        []model.Mode{planMode}, // Project Manager fits well in Plan mode
 		},
 		{
 			Name:         consts.AgentNameUxUi,
 			Description:  "Designs intuitive and accessible user interfaces.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptUxUi,
-			ModeID:       buildMode.ID, // Designers might need to see code/assets (Build mode) or just Plan
+			Modes:        []model.Mode{buildMode}, // Designers might need to see code/assets (Build mode) or just Plan
 		},
 		{
 			Name:         consts.AgentNameGolang,
 			Description:  "Expert in Golang backend development.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptGolang,
-			ModeID:       buildMode.ID,
+			Modes:        []model.Mode{buildMode},
 		},
 		{
 			Name:         consts.AgentNamePython,
 			Description:  "Expert in Python scripting and backend development.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptPython,
-			ModeID:       buildMode.ID,
+			Modes:        []model.Mode{buildMode},
 		},
 		{
 			Name:         consts.AgentNameJavascript,
 			Description:  "Expert in JavaScript and Frontend development.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptJavascript,
-			ModeID:       buildMode.ID,
+			Modes:        []model.Mode{buildMode},
 		},
 		{
 			Name:         consts.AgentNameTest,
 			Description:  "Ensures quality through automated and manual testing.",
 			Type:         consts.AgentTypeBuiltin,
 			SystemPrompt: consts.SystemPromptTest,
-			ModeID:       buildMode.ID,
+			Modes:        []model.Mode{buildMode},
 		},
 	}
 
@@ -157,14 +157,14 @@ func seedBuiltinAgents(db *gorm.DB) {
 			db.Create(&agent)
 			log.Printf("Seeded builtin agent: %s", agent.Name)
 		} else {
-			// Update ModeID and SystemPrompt for existing agents if they changed
+			// Update Modes and SystemPrompt for existing agents if they changed
 			var existingAgent model.Agent
-			db.Where("name = ? AND type = ?", agent.Name, consts.AgentTypeBuiltin).First(&existingAgent)
+			db.Preload("Modes").Where("name = ? AND type = ?", agent.Name, consts.AgentTypeBuiltin).First(&existingAgent)
 
 			needsUpdate := false
-			if existingAgent.ModeID == 0 {
-				existingAgent.ModeID = agent.ModeID
-				needsUpdate = true
+			if len(existingAgent.Modes) == 0 {
+				db.Model(&existingAgent).Association("Modes").Replace(agent.Modes)
+				log.Printf("Updated builtin agent modes: %s", agent.Name)
 			}
 			if existingAgent.SystemPrompt != agent.SystemPrompt {
 				existingAgent.SystemPrompt = agent.SystemPrompt

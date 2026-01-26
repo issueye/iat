@@ -153,7 +153,7 @@ func (a *App) ListAgents() *result.Result {
 	return a.proxyRequest(http.MethodGet, "/agents", nil)
 }
 
-func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) *result.Result {
+func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeIDs []uint, status string, capabilities string) *result.Result {
 	payload := map[string]interface{}{
 		"name":           name,
 		"description":    description,
@@ -162,7 +162,7 @@ func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalUR
 		"modelId":        modelID,
 		"toolIds":        toolIDs,
 		"mcpServerIds":   mcpServerIDs,
-		"modeId":         modeID,
+		"modeIds":        modeIDs,
 		"externalUrl":    externalURL,
 		"externalType":   externalType,
 		"externalParams": externalParams,
@@ -172,7 +172,7 @@ func (a *App) CreateAgent(name, description, systemPrompt, agentType, externalUR
 	return a.proxyRequest(http.MethodPost, "/agents", payload)
 }
 
-func (a *App) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeID uint, status string, capabilities string) *result.Result {
+func (a *App) UpdateAgent(id uint, name, description, systemPrompt, agentType, externalURL, externalType, externalParams string, modelID uint, toolIDs []uint, mcpServerIDs []uint, modeIDs []uint, status string, capabilities string) *result.Result {
 	payload := map[string]interface{}{
 		"name":           name,
 		"description":    description,
@@ -181,7 +181,7 @@ func (a *App) UpdateAgent(id uint, name, description, systemPrompt, agentType, e
 		"modelId":        modelID,
 		"toolIds":        toolIDs,
 		"mcpServerIds":   mcpServerIDs,
-		"modeId":         modeID,
+		"modeIds":        modeIDs,
 		"externalUrl":    externalURL,
 		"externalType":   externalType,
 		"externalParams": externalParams,

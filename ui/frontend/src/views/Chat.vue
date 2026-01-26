@@ -300,7 +300,7 @@ const agentOptions = computed(() => {
   if (!mode) return [];
 
   return agents.value
-    .filter((a) => a.modeId === mode.id)
+    .filter((a) => (a.modes || []).some((m) => m.id === mode.id))
     .map((a) => ({
       label: a.name,
       value: a.id,
@@ -320,14 +320,17 @@ watch(currentChatMode, (newMode) => {
   }
 });
 
-// Watch agent change to sync mode
+// Watch agent change to sync mode (if current agent doesn't support current mode)
 watch(currentChatAgentId, (newAgentId) => {
   if (!newAgentId) return;
   const agent = agents.value.find((a) => a.id === newAgentId);
-  if (agent && agent.modeId) {
-    const mode = agentStore.modes.find((m) => m.id === agent.modeId);
-    if (mode && mode.key !== currentChatMode.value) {
-      currentChatMode.value = mode.key;
+  if (agent && agent.modes && agent.modes.length > 0) {
+    const supportsCurrentMode = agent.modes.some(
+      (m) => m.key === currentChatMode.value,
+    );
+    if (!supportsCurrentMode) {
+      // Switch to first supported mode of this agent
+      currentChatMode.value = agent.modes[0].key;
     }
   }
 });

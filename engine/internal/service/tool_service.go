@@ -137,7 +137,11 @@ func (s *ToolService) GetEinoTools(agent *model.Agent) ([]*schema.ToolInfo, erro
 	var infos []*schema.ToolInfo
 
 	// Add Builtins based on mode
-	infos = append(infos, builtin.GetEinoTools(agent.Mode.Key)...)
+	m := ""
+	if len(agent.Modes) > 0 {
+		m = agent.Modes[0].Key
+	}
+	infos = append(infos, builtin.GetEinoTools(m)...)
 
 	// Add MCP Tools
 	if s.mcpService != nil {

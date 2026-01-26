@@ -175,7 +175,10 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName string, userMes
 	}
 
 	// Permission Check
-	effectiveMode := targetAgent.Mode.Key
+	effectiveMode := ""
+	if len(targetAgent.Modes) > 0 {
+		effectiveMode = targetAgent.Modes[0].Key
+	}
 	if effectiveMode == "" {
 		effectiveMode = "chat"
 	}
@@ -545,7 +548,11 @@ func applyExternalPlaceholders(params map[string]interface{}, session *model.Ses
 		if modeKey != "" {
 			out = strings.ReplaceAll(out, "${mode}", modeKey)
 		} else {
-			out = strings.ReplaceAll(out, "${mode}", agent.Mode.Key)
+			m := ""
+			if len(agent.Modes) > 0 {
+				m = agent.Modes[0].Key
+			}
+			out = strings.ReplaceAll(out, "${mode}", m)
 		}
 		if project != nil {
 			out = strings.ReplaceAll(out, "${projectId}", fmt.Sprint(project.ID))
@@ -764,7 +771,10 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 	// Permission Check based on Agent Mode
 	// If modeKey is provided, it overrides the agent's default mode.
-	effectiveMode := agent.Mode.Key
+	effectiveMode := ""
+	if len(agent.Modes) > 0 {
+		effectiveMode = agent.Modes[0].Key
+	}
 	if modeKey != "" {
 		effectiveMode = modeKey
 	}
