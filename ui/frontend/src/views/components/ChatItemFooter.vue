@@ -14,7 +14,7 @@
 
     <!-- token -->
     <span class="token-usage" v-if="item.role !== 'tool'">
-      TOKEN {{ item.tokenUsage }}
+      TOKEN {{ item.tokenCount }}
     </span>
   </div>
   <!-- Debug Console Drawer -->
@@ -136,44 +136,44 @@ const showPromptModalFn = (item) => {
 <style scoped>
 .debug-logs {
   font-family: "Fira Code", monospace;
-  font-size: 11px;
+  font-size: var(--base-font-size-sm);
 }
 .log-item {
-  margin-bottom: 12px;
-  border-bottom: 1px solid #f0f0f0;
-  padding-bottom: 8px;
+  margin-bottom: var(--base-gap);
+  border-bottom: 1px solid var(--color-grey);
+  padding-bottom: var(--base-gap);
 }
 .log-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--base-gap);
+  margin-bottom: var(--base-gap-sm);
 }
 .log-time {
-  color: #999;
+  color: var(--color-grey-text);
 }
 .log-data {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-all;
-  color: #444;
-  background: #f9f9f9;
-  padding: 4px;
-  border-radius: 2px;
+  color: var(--color-text);
+  background: var(--color-grey-light);
+  padding: var(--base-padding-sm);
+  border-radius: var(--base-radius-sm);
 }
 .empty-logs {
   text-align: center;
-  color: #ccc;
-  padding: 40px 0;
+  color: var(--color-grey-text);
+  padding: var(--base-padding) 0;
 }
 
 .message-footer {
   display: flex;
-  gap: 8px;
+  gap: var(--base-gap);
 }
 
 .token-usage {
-  font-size: 12px;
-  color: #999;
+  font-size: var(--base-font-size-sm);
+  color: var(--color-grey-text);
 }
 </style>

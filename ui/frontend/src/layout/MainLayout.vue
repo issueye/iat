@@ -4,7 +4,7 @@
       bordered
       collapse-mode="width"
       :collapsed-width="64"
-      :width="240"
+      :width="200"
       :collapsed="collapsed"
       show-trigger
       @collapse="collapsed = true"

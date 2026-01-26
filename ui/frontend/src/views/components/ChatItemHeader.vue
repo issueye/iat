@@ -28,12 +28,12 @@ const header = computed(() => {
 .message-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--base-gap-sm);
 }
 
 .message-time {
-  margin-left: 8px;
-  font-size: 12px;
-  color: #ccc;
+  margin-left: var(--base-gap-sm);
+  font-size: var(--base-font-size-sm);
+  color: var(--color-grey-text);
 }
 </style>

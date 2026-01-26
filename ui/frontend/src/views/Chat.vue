@@ -529,21 +529,25 @@ onMounted(() => {
 
 <style scoped>
 :deep(.el-bubble-content-wrapper .el-bubble-footer) {
-  margin-top: 4px;
+  margin-top: var(--base-gap-sm);
+}
+
+:deep(.el-bubble-content-wrapper .el-bubble-content-filled) {
+  padding: 0px;
 }
 
 .chat-container {
   display: flex;
   height: 100%;
-  background-color: #f8f9fa;
+  background-color: var(--color-grey-light);
   overflow: hidden;
 }
 
 /* Sidebar Styling */
 .chat-sidebar {
-  width: 300px;
-  background-color: #ffffff;
-  border-right: 1px solid #e9ecef;
+  width: var(--sidebar-width);
+  background-color: var(--color-light);
+  border-right: 1px solid var(--color-grey-light);
   display: flex;
   flex-direction: column;
   transition: all 0.3s;
@@ -551,18 +555,18 @@ onMounted(() => {
 }
 
 .sidebar-header {
-  padding: 20px 16px;
-  border-bottom: 1px solid #f1f3f5;
+  padding: var(--base-padding-sm) var(--base-padding);
+  border-bottom: 1px solid var(--color-grey-light);
 }
 
 .session-search {
-  padding: 12px 16px;
+  padding: var(--base-padding-sm) var(--base-padding);
 }
 
 .session-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: var(--base-padding);
 }
 
 .session-list::-webkit-scrollbar {
@@ -575,27 +579,27 @@ onMounted(() => {
 }
 
 .session-item {
-  padding: 12px 16px;
+  padding: var(--base-padding-sm) var(--base-padding);
   cursor: pointer;
-  border-radius: 10px;
-  margin-bottom: 4px;
+  border-radius: var(--base-radius);
+  margin-bottom: var(--base-gap-sm);
   transition: all 0.2s;
   border: 1px solid transparent;
 }
 
 .session-item:hover {
-  background-color: #f1f3f5;
+  background-color: var(--color-grey-light);
 }
 
 .session-item.active {
-  background-color: #e7f5ff;
-  border-color: #a5d8ff;
+  background-color: var(--color-light);
+  border-color: var(--color-info);
 }
 
 .session-name {
   font-size: 14px;
   font-weight: 500;
-  color: #212529;
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -603,7 +607,7 @@ onMounted(() => {
 
 .session-time {
   font-size: 11px;
-  color: #adb5bd;
+  color: var(--color-grey-text);
   margin-top: 4px;
 }
 

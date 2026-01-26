@@ -2,7 +2,7 @@
   <div v-if="item.role === 'tool'" class="tool-call-bubble">
     <div class="tool-header">
       <n-icon><ContractOutline /></n-icon>
-      <span>工具调用: {{ item.toolName }}</span>
+      <span>{{ item.toolName }}</span>
     </div>
     <pre class="tool-args">{{ item.toolArguments }}</pre>
   </div>
@@ -114,35 +114,35 @@ function getTasksByMessage(msg) {
 </script>
 <style scoped>
 .sub-agent-tasks-container {
-  margin-top: 16px;
+  margin-top: var(--base-gap-md);
 }
 
 .tool-call-bubble {
-  background-color: #f8f9fa;
-  border-radius: 12px;
-  padding: 12px 16px;
-  border-left: 4px solid #339af0;
+  background-color: var(--color-grey-light);
+  border-radius: var(--shiki-custom-brr);
+  padding: var(--base-padding-sm) var(--base-padding-md);
+  border-left: 4px solid var(--color-primary);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
 }
 
 .tool-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--base-gap-sm);
   font-weight: 600;
-  font-size: 13px;
-  color: #495057;
-  margin-bottom: 8px;
+  font-size: var(--base-font-size-md);
+  color: var(--color-text);
+  margin-bottom: var(--base-gap-sm);
 }
 
 .tool-args {
   margin: 0;
-  font-size: 12px;
-  color: #495057;
-  background: #ffffff;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
+  font-size: var(--base-font-size-sm);
+  color: var(--color-text);
+  background: var(--color-grey-light);
+  padding: var(--base-padding-sm);
+  border-radius: var(--base-radius);
+  border: 1px solid var(--color-grey);
   overflow-x: auto;
   font-family: "Fira Code", monospace;
 }

@@ -8,7 +8,7 @@ import router from "./router";
 import "./style.css";
 import hljs from "highlight.js";
 import "highlight.js/styles/atom-one-dark.css";
-import XMarkdown from "./components/renderers/XMarkdown.vue";
+import "@/assets/css/index.css";
 
 const app = createApp(App);
 
