@@ -87,6 +87,10 @@ export const api = {
   },
   getSessionMessages: getMessages,
   clearSessionMessages: deleteMessages,
+  deleteMessage: async (id: number) => {
+    const resp = await client.delete(`/messages/${id}`);
+    return resp.data;
+  },
   abortSession: async (id: number) => {
     const resp = await client.post(`/sessions/${id}/abort`);
     return resp.data;

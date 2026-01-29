@@ -147,7 +147,7 @@
             </n-avatar>
           </template>
           <template #header="{ item }">
-            <ChatItemHeader :item="item" />
+            <ChatItemHeader :item="item" @delete="handleDeleteMessage(item)" />
           </template>
           <template #content="{ item }">
             <ChatItemContent
@@ -449,6 +449,24 @@ async function handleDeleteSession(session) {
           subAgentTaskMap.value.clear();
         }
         await chatStore.fetchSessions(currentProjectId.value);
+      } catch (e) {
+        message.error("删除失败: " + e.message);
+      }
+    },
+  });
+}
+
+async function handleDeleteMessage(msg) {
+  dialog.warning({
+    title: "删除消息",
+    content: "确定要删除这条消息吗？",
+    positiveText: "删除",
+    negativeText: "取消",
+    onPositiveClick: async () => {
+      try {
+        await api.deleteMessage(msg.id);
+        chatStore.removeMessage(msg.id);
+        message.success("消息已删除");
       } catch (e) {
         message.error("删除失败: " + e.message);
       }

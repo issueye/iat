@@ -342,6 +342,15 @@ func (s *Server) Start() error {
 		}
 	})
 
+	// Messages
+	mux.HandleFunc("/api/messages/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			sessionHandler.DeleteMessage(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
 	// Chat Stream
 	mux.HandleFunc("/api/chat/stream", chatHandler.Stream)
 

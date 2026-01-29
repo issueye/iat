@@ -115,6 +115,10 @@ func (s *ChatService) ClearMessages(sessionID uint) error {
 	return nil
 }
 
+func (s *ChatService) RemoveMessage(id uint) error {
+	return s.messageRepo.DeleteByID(id)
+}
+
 func (s *ChatService) emitEvent(sessionID uint, event chat.ChatEvent, eventChan chan<- chat.ChatEvent) {
 	if eventChan != nil {
 		eventChan <- event

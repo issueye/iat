@@ -26,6 +26,10 @@ func (r *MessageRepo) DeleteBySessionID(sessionID uint) error {
 	return db.DB.Where("session_id = ?", sessionID).Delete(&model.Message{}).Error
 }
 
+func (r *MessageRepo) DeleteByID(id uint) error {
+	return db.DB.Delete(&model.Message{}, id).Error
+}
+
 func (r *MessageRepo) UpsertToolCall(sessionID uint, toolCallID string, name string, arguments string) error {
 	if toolCallID == "" {
 		return db.DB.Create(&model.Message{

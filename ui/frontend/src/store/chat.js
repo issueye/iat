@@ -80,6 +80,12 @@ export const useChatStore = defineStore('chat', {
     addMessage(msg) {
       return this.messages.push(msg)
     },
+    removeMessage(id) {
+      const idx = this.messages.findIndex(m => m.id === id)
+      if (idx !== -1) {
+        this.messages.splice(idx, 1)
+      }
+    },
     updateLastMessage(content) {
       if (this.messages.length > 0) {
         const last = this.messages[this.messages.length - 1]

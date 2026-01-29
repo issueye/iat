@@ -158,3 +158,24 @@ func (h *SessionHandler) Abort(w http.ResponseWriter, r *http.Request) {
 	h.chatSvc.AbortSession(uint(id))
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *SessionHandler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+	// /api/messages/{id}
+	parts := strings.Split(path, "/")
+	if len(parts) < 4 {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.Atoi(parts[3])
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.chatSvc.RemoveMessage(uint(id)); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
