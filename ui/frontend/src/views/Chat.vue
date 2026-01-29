@@ -110,6 +110,18 @@
           </n-button>
           <n-button
             size="small"
+            secondary
+            type="info"
+            @click="showTaskList = !showTaskList"
+            :disabled="!currentSessionId"
+          >
+            <template #icon>
+              <n-icon><ListIcon /></n-icon>
+            </template>
+            {{ showTaskList ? "隐藏任务" : "显示任务" }}
+          </n-button>
+          <n-button
+            size="small"
             type="warning"
             secondary
             @click="handleStop"
@@ -124,52 +136,62 @@
       </div>
 
       <div class="chat-main-content">
-        <WorkflowCanvas
-          v-if="currentWorkflowTasks.length > 0"
-          :tasks="currentWorkflowTasks"
-          style="margin-bottom: 10px"
-        />
-        <BubbleList
-          :list="displayMessages"
-          :loading="isGenerating"
-          class="messages-area"
-          :bubble-props="{ showTime: true }"
-          :auto-scroll="displayMessages.length >= 2"
-        >
-          <template #avatar="{ item }">
-            <n-avatar
-              size="medium"
-              round
-              :color="item.role === 'user' ? '#e7f5ff' : '#f3f0ff'"
-              :text-color="item.role === 'user' ? '#228be6' : '#7950f2'"
-            >
-              {{ item.role === "user" ? "U" : "AI" }}
-            </n-avatar>
-          </template>
-          <template #header="{ item }">
-            <ChatItemHeader :item="item" @delete="handleDeleteMessage(item)" />
-          </template>
-          <template #content="{ item }">
-            <ChatItemContent
-              :item="item"
-              :messages="messages"
-              :taskMap="subAgentTaskMap"
-            />
-          </template>
-          <template #footer="{ item }">
-            <ChatItemFooter :item="item" />
-          </template>
-        </BubbleList>
-
-        <div class="input-area">
-          <Sender
-            v-model="inputText"
-            :disabled="isGenerating"
-            :loading="isGenerating"
-            placeholder="输入消息... (Ctrl+Enter 发送)"
-            @submit="handleSend"
-            @cancel="handleStop"
+        <div class="chat-area" :class="{ 'with-sidebar': showTaskList }">
+          <WorkflowCanvas
+            v-if="currentWorkflowTasks.length > 0"
+            :tasks="currentWorkflowTasks"
+            style="margin-bottom: 10px"
           />
+          <BubbleList
+            :list="displayMessages"
+            :loading="isGenerating"
+            class="messages-area"
+            :bubble-props="{ showTime: true }"
+            :auto-scroll="displayMessages.length >= 2"
+          >
+            <template #avatar="{ item }">
+              <n-avatar
+                size="medium"
+                round
+                :color="item.role === 'user' ? '#e7f5ff' : '#f3f0ff'"
+                :text-color="item.role === 'user' ? '#228be6' : '#7950f2'"
+              >
+                {{ item.role === "user" ? "U" : "AI" }}
+              </n-avatar>
+            </template>
+            <template #header="{ item }">
+              <ChatItemHeader
+                :item="item"
+                @delete="handleDeleteMessage(item)"
+              />
+            </template>
+            <template #content="{ item }">
+              <ChatItemContent
+                :item="item"
+                :messages="messages"
+                :taskMap="subAgentTaskMap"
+              />
+            </template>
+            <template #footer="{ item }">
+              <ChatItemFooter :item="item" />
+            </template>
+          </BubbleList>
+
+          <div class="input-area">
+            <Sender
+              v-model="inputText"
+              :disabled="isGenerating"
+              :loading="isGenerating"
+              placeholder="输入消息... (Ctrl+Enter 发送)"
+              @submit="handleSend"
+              @cancel="handleStop"
+            />
+          </div>
+        </div>
+
+        <!-- Task List Sidebar -->
+        <div v-if="showTaskList" class="task-sidebar">
+          <TaskList :session-id="currentSessionId" />
         </div>
       </div>
     </div>
@@ -228,6 +250,7 @@ import {
   InformationCircleOutline,
   StopCircleOutline,
   RefreshOutline,
+  ListOutline as ListIcon,
 } from "@vicons/ionicons5";
 import { api } from "../api";
 import { useAgentStore } from "../store/agent";
@@ -235,6 +258,7 @@ import { useChatStore } from "../store/chat";
 import { useProjectStore } from "../store/project";
 import { useWorkflowStore } from "../store/workflow";
 import WorkflowCanvas from "../components/workflow/WorkflowCanvas.vue";
+import TaskList from "../components/TaskList.vue";
 import ChatItemHeader from "./components/ChatItemHeader.vue";
 import ChatItemFooter from "./components/ChatItemFooter.vue";
 import ChatItemContent from "./components/ChatItemContent.vue";
@@ -358,6 +382,7 @@ watch(currentChatAgentId, (newAgentId) => {
 
 // UI State
 const showCreateModal = ref(false);
+const showTaskList = ref(false); // Toggle for task list
 const newSessionName = ref("");
 const sessionSearchQuery = ref("");
 const searchedSessions = ref([]);
@@ -816,16 +841,38 @@ onMounted(() => {
 }
 
 .chat-main-content {
-  width: calc(100% - 1px);
-  height: calc(100% - 45px);
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-area {
+  flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.chat-area.with-sidebar {
+  flex: 1;
+  border-right: 1px solid #eee;
+}
+
+.task-sidebar {
+  width: 300px;
+  background-color: #fff;
+  border-left: 1px solid #eee;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
 }
 
 .messages-area {
   flex: 1;
-  padding: var(--base-padding);
+  padding: 16px;
   overflow-y: auto;
 }
 

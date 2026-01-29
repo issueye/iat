@@ -38,7 +38,8 @@ func (s *Server) Start() error {
 	toolSvc := service.NewToolService(mcpSvc)
 	taskSvc := service.NewTaskService(nil)                 // TODO: Handle SSE for tasks
 	subAgentTaskSvc := service.NewSubAgentTaskService(nil) // TODO: Handle SSE for sub-agent tasks
-	chatSvc := service.NewChatService(mcpSvc, toolSvc, taskSvc, subAgentTaskSvc, wsHub)
+	hookSvc := service.NewHookService()
+	chatSvc := service.NewChatService(mcpSvc, toolSvc, taskSvc, subAgentTaskSvc, hookSvc, wsHub)
 	sessionSvc := service.NewSessionService()
 	modelSvc := service.NewAIModelService()
 	agentSvc := service.NewAgentService()
@@ -80,6 +81,8 @@ func (s *Server) Start() error {
 	toolHandler := handler.NewToolHandler(toolSvc)
 	mcpHandler := handler.NewMCPHandler(mcpSvc)
 	modeHandler := handler.NewModeHandler(modeSvc)
+	hookHandler := handler.NewHookHandler(hookSvc)
+	taskHandler := handler.NewTaskHandler(taskSvc)
 	subAgentTaskHandler := handler.NewSubAgentTaskHandler(subAgentTaskSvc)
 	runtimeTestHandler := handler.NewRuntimeTestHandler()
 	registryHandler := handler.NewRegistryHandler(registrySvc)
@@ -116,6 +119,28 @@ func (s *Server) Start() error {
 		wsHub.Register(client)
 		go client.WritePump()
 		go client.ReadPump(wsHub)
+	})
+
+	// Tasks
+	mux.HandleFunc("/api/tasks", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			taskHandler.List(w, r)
+		case http.MethodPost:
+			taskHandler.Create(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			taskHandler.Update(w, r)
+		case http.MethodDelete:
+			taskHandler.Delete(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 
 	// Sub-Agent Tasks
@@ -295,6 +320,28 @@ func (s *Server) Start() error {
 		if r.Method == http.MethodGet {
 			modeHandler.List(w, r)
 		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+
+	// Hooks
+	mux.HandleFunc("/api/hooks", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			hookHandler.List(w, r)
+		case http.MethodPost:
+			hookHandler.Create(w, r)
+		default:
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+	mux.HandleFunc("/api/hooks/", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			hookHandler.Update(w, r)
+		case http.MethodDelete:
+			hookHandler.Delete(w, r)
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})

@@ -1,51 +1,95 @@
 <script setup>
-import { ref, computed } from "vue";
-import { NTag, NCheckbox, NButton, NIcon, NInput, NEmpty, NScrollbar, NSpace } from "naive-ui";
-import { TrashOutline, AddOutline } from "@vicons/ionicons5";
+import { ref, computed, watch, onMounted } from "vue";
+import { NTag, NCheckbox, NButton, NIcon, NInput, NEmpty, NScrollbar, useMessage } from "naive-ui";
+import { TrashOutline, AddOutline, RefreshOutline as RefreshIcon } from "@vicons/ionicons5";
+import { api } from "../api";
 
 const props = defineProps({
-  tasks: { type: Array, default: () => [] },
-  loading: Boolean,
+  sessionId: { type: Number, required: true },
 });
 
-const emit = defineEmits(["update:status", "delete", "add"]);
-
+const message = useMessage();
+const tasks = ref([]);
+const loading = ref(false);
 const newTaskContent = ref("");
 
-function handleAdd() {
-  if (!newTaskContent.value.trim()) return;
-  emit("add", newTaskContent.value);
-  newTaskContent.value = "";
+async function fetchTasks() {
+  if (!props.sessionId) return;
+  loading.value = true;
+  try {
+    tasks.value = await api.listTasks(props.sessionId);
+  } catch (e) {
+    message.error("获取任务列表失败");
+  } finally {
+    loading.value = false;
+  }
 }
 
-function handleCheck(task, checked) {
+watch(() => props.sessionId, () => {
+  fetchTasks();
+});
+
+onMounted(() => {
+  fetchTasks();
+});
+
+async function handleAdd() {
+  if (!newTaskContent.value.trim()) return;
+  try {
+    const task = await api.createTask(props.sessionId, newTaskContent.value, "medium");
+    tasks.value.push(task);
+    newTaskContent.value = "";
+    message.success("添加成功");
+  } catch (e) {
+    message.error("添加失败");
+  }
+}
+
+async function handleCheck(task, checked) {
   const newStatus = checked ? "completed" : "pending";
-  emit("update:status", task.id, newStatus);
+  // Optimistic update
+  const oldStatus = task.status;
+  task.status = newStatus;
+  
+  try {
+    await api.updateTask(task.id, newStatus);
+  } catch (e) {
+    task.status = oldStatus; // Revert on error
+    message.error("更新状态失败");
+  }
+}
+
+async function handleDelete(id) {
+  try {
+    await api.deleteTask(id);
+    tasks.value = tasks.value.filter(t => t.id !== id);
+    message.success("删除成功");
+  } catch (e) {
+    message.error("删除失败");
+  }
 }
 
 function priorityType(p) {
   switch (p) {
-    case "high":
-      return "error";
-    case "medium":
-      return "warning";
-    case "low":
-      return "info";
-    default:
-      return "default";
+    case "high": return "error";
+    case "medium": return "warning";
+    case "low": return "info";
+    default: return "default";
   }
 }
 
 const sortedTasks = computed(() => {
-  return [...props.tasks].sort((a, b) => {
-    // Sort by status (pending first) then id
+  return [...tasks.value].sort((a, b) => {
     if (a.status === "completed" && b.status !== "completed") return 1;
     if (a.status !== "completed" && b.status === "completed") return -1;
-    return a.id - b.id;
+    return b.id - a.id; // Newest first
   });
 });
 
-const completedCount = computed(() => props.tasks.filter(t => t.status === 'completed').length);
+const completedCount = computed(() => tasks.value.filter(t => t.status === 'completed').length);
+
+// Expose refresh method for parent
+defineExpose({ refresh: fetchTasks });
 </script>
 
 <template>
@@ -55,6 +99,9 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
       <n-tag v-if="tasks.length > 0" size="small" round :bordered="false">
         {{ completedCount }} / {{ tasks.length }}
       </n-tag>
+      <n-button text size="tiny" @click="fetchTasks" :loading="loading">
+        <template #icon><n-icon><RefreshIcon /></n-icon></template>
+      </n-button>
     </div>
 
     <div class="add-box">
@@ -82,7 +129,6 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
           :key="task.id"
           class="task-item"
           :class="{ completed: task.status === 'completed' }"
-          :style="{ paddingLeft: (12 + (task.level || 0) * 20) + 'px' }"
         >
           <n-checkbox
             :checked="task.status === 'completed'"
@@ -95,7 +141,7 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
               <n-tag size="tiny" :type="priorityType(task.priority)" :bordered="false" style="margin-right: 4px; padding: 0 4px; height: 16px; font-size: 10px;">
                 {{ task.priority }}
               </n-tag>
-              <n-button size="tiny" text type="error" @click="$emit('delete', task.id)" class="del-btn">
+              <n-button size="tiny" text type="error" @click="handleDelete(task.id)" class="del-btn">
                 <template #icon><n-icon><TrashOutline /></n-icon></template>
               </n-button>
             </div>
@@ -107,12 +153,13 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
 </template>
 
 <style scoped>
+/* Same styles as before, kept for brevity */
 .task-list-container {
   display: flex;
   flex-direction: column;
   height: 100%;
   background-color: #fff;
-  border-left: 1px solid #eee;
+  /* Border handled by parent */
 }
 
 .header {
@@ -181,3 +228,4 @@ const completedCount = computed(() => props.tasks.filter(t => t.status === 'comp
   justify-content: center;
 }
 </style>
+

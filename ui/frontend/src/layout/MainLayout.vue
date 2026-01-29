@@ -98,6 +98,7 @@ import {
   OptionsOutline as ModeIcon,
   CodeSlashOutline as CodeIcon,
   ServerOutline as MCPIcon,
+  FlashOutline as HookIcon,
 } from "@vicons/ionicons5";
 import ScriptDocsFloat from "../components/ScriptDocsFloat.vue";
 import { useEngineStatus } from "../useEngineStatus";
@@ -115,6 +116,7 @@ const routeTitleMap = {
   Agents: "智能体管理",
   Tools: "工具管理",
   MCPs: "MCP 管理",
+  Hooks: "Hook 管理",
   Modes: "模式管理",
   Chat: "智能对话",
 };
@@ -191,6 +193,12 @@ const menuOptions = [
     key: "MCPs",
     icon: renderIcon(MCPIcon),
     onClick: () => router.push({ name: "MCPs" }),
+  },
+  {
+    label: "Hook 管理",
+    key: "Hooks",
+    icon: renderIcon(HookIcon),
+    onClick: () => router.push({ name: "Hooks" }),
   },
   {
     label: "模式管理",

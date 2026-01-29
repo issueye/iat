@@ -42,6 +42,11 @@ const routes = [
             },
             // ScriptDocs route removed as it is now a float window
             {
+                path: 'hooks',
+                name: 'Hooks',
+                component: () => import('../views/Hooks.vue')
+            },
+            {
                 path: 'chat/:sessionId?',
                 name: 'Chat',
                 component: () => import('../views/Chat.vue')

@@ -45,6 +45,7 @@ func InitDB() error {
 		&model.SubAgentTask{},
 		&model.Workflow{},
 		&model.WorkflowTask{},
+		&model.Hook{},
 	)
 	if err != nil {
 		return err

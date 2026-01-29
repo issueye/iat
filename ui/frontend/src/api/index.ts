@@ -106,5 +106,41 @@ export const api = {
     return resp.data;
   },
 
+  // Hook Methods
+  listHooks: async () => {
+    const resp = await client.get("/hooks");
+    return resp.data;
+  },
+  createHook: async (hook: any) => {
+    const resp = await client.post("/hooks", hook);
+    return resp.data;
+  },
+  updateHook: async (hook: any) => {
+    const resp = await client.put(`/hooks/${hook.id}`, hook);
+    return resp.data;
+  },
+  deleteHook: async (id: number) => {
+    const resp = await client.delete(`/hooks/${id}`);
+    return resp.data;
+  },
+
+  // Task Methods (Simple Tasks)
+  listTasks: async (sessionId: number) => {
+    const resp = await client.get(`/tasks?sessionId=${sessionId}`);
+    return resp.data;
+  },
+  createTask: async (sessionId: number, content: string, priority: string) => {
+    const resp = await client.post("/tasks", { sessionId, content, priority });
+    return resp.data;
+  },
+  updateTask: async (id: number, status: string) => {
+    const resp = await client.put(`/tasks/${id}`, { status });
+    return resp.data;
+  },
+  deleteTask: async (id: number) => {
+    const resp = await client.delete(`/tasks/${id}`);
+    return resp.data;
+  },
+
   // Note: Chat stream is handled via EventSource or fetch stream manually
 };

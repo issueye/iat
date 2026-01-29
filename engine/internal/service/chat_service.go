@@ -69,6 +69,7 @@ type ChatService struct {
 	toolService         *ToolService
 	taskService         *TaskService
 	subAgentTaskService *SubAgentTaskService
+	hookService         *HookService
 	wsHub               *WSHub
 	executor            WorkflowExecutor
 	plannerFactory      func(client *ai.AIClient) TaskPlanner
@@ -77,7 +78,7 @@ type ChatService struct {
 	cancelBySID         map[uint]sessionCancel
 }
 
-func NewChatService(mcpService *MCPService, toolService *ToolService, taskService *TaskService, subAgentTaskService *SubAgentTaskService, wsHub *WSHub) *ChatService {
+func NewChatService(mcpService *MCPService, toolService *ToolService, taskService *TaskService, subAgentTaskService *SubAgentTaskService, hookService *HookService, wsHub *WSHub) *ChatService {
 	return &ChatService{
 		projectRepo:         repo.NewProjectRepo(),
 		sessionRepo:         repo.NewSessionRepo(),
@@ -89,6 +90,7 @@ func NewChatService(mcpService *MCPService, toolService *ToolService, taskServic
 		toolService:         toolService,
 		taskService:         taskService,
 		subAgentTaskService: subAgentTaskService,
+		hookService:         hookService,
 		wsHub:               wsHub,
 		cancelBySID:         make(map[uint]sessionCancel),
 	}
@@ -829,8 +831,31 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		return fmt.Errorf("agent not found: %v", err)
 	}
 
+	var finalResponse string
+	// HOOK: post_chat
+	defer func() {
+		if s.hookService != nil {
+			_ = s.hookService.ExecuteHooks(ctx, "post_chat", "agent", agent.ID, map[string]any{
+				"sessionId":   sessionID,
+				"agentName":   agent.Name,
+				"userMessage": userMessage,
+				"response":    finalResponse,
+			})
+		}
+	}()
+
 	if agent.Type == "external" && agent.ExternalURL != "" {
 		return s.chatWithExternalAgent(ctx, session, agent, userMessage, modeKey, project, eventChan)
+	}
+
+	// HOOK: pre_chat
+	if s.hookService != nil {
+		_ = s.hookService.ExecuteHooks(ctx, "pre_chat", "agent", agent.ID, map[string]any{
+			"sessionId":   sessionID,
+			"userMessage": userMessage,
+			"agentName":   agent.Name,
+			"projectId":   session.ProjectID,
+		})
 	}
 
 	// Permission Check based on Agent Mode
@@ -1154,6 +1179,11 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 				Content:   stripThinkContent(fullResponse),
 				ToolCalls: toolCalls,
 			})
+
+			// Update final response for hook
+			if fullResponse != "" {
+				finalResponse = fullResponse
+			}
 		}
 
 		// If no tool calls, we are done
@@ -1172,6 +1202,16 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			fnName := tc.Function.Name
 			fnArgs := tc.Function.Arguments
 			fmt.Printf("[ChatService] Executing tool: %s\n", fnName) // LOG
+
+			// HOOK: pre_tool
+			if s.hookService != nil {
+				_ = s.hookService.ExecuteHooks(ctx, "pre_tool", "agent", agent.ID, map[string]any{
+					"sessionId": sessionID,
+					"toolName":  fnName,
+					"arguments": fnArgs,
+					"agentName": agent.Name,
+				})
+			}
 
 			s.sendToolEvent(sessionID, map[string]interface{}{
 				"stage":      consts.ToolStageCall,
@@ -1312,6 +1352,18 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 			if toolErr != nil {
 				resultStr = fmt.Sprintf("Error: %v", toolErr)
+			}
+
+			// HOOK: post_tool
+			if s.hookService != nil {
+				_ = s.hookService.ExecuteHooks(ctx, "post_tool", "agent", agent.ID, map[string]any{
+					"sessionId": sessionID,
+					"toolName":  fnName,
+					"arguments": fnArgs,
+					"result":    resultStr,
+					"error":     toolErr,
+					"agentName": agent.Name,
+				})
 			}
 
 			// ... (upsert result)
