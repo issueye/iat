@@ -398,6 +398,65 @@ func (s *ChatService) RunAgentInternal(sessionID uint, agentName string, userMes
 	return "", fmt.Errorf("max turns exceeded")
 }
 
+func (s *ChatService) createDynamicAgent(ctx context.Context, name string, intent string) (*model.Agent, error) {
+	// Get default model
+	modelConfig, err := s.modelRepo.GetDefault()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get default model for dynamic agent: %v", err)
+	}
+
+	aiClient, err := ai.NewAIClient(modelConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AI client: %v", err)
+	}
+
+	// Prompt to generate System Prompt
+	sysPromptReq := []*schema.Message{
+		{
+			Role: schema.System,
+			Content: `You are an expert agent architect.
+The user needs a new specialized agent named "` + name + `" to help with the following task:
+"` + intent + `"
+
+Please generate a high-quality, detailed System Prompt for this new agent.
+The System Prompt should:
+1. Define the agent's persona and expertise.
+2. Set clear goals and constraints.
+3. Encourage professional and concise responses.
+
+Output ONLY the System Prompt content, no other text.`,
+		},
+	}
+
+	resp, err := aiClient.Chat(ctx, sysPromptReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate system prompt: %v", err)
+	}
+
+	generatedPrompt := strings.TrimSpace(resp.Content)
+	// Clean up potential markdown code blocks if the LLM wraps it
+	generatedPrompt = strings.TrimPrefix(generatedPrompt, "```")
+	generatedPrompt = strings.TrimPrefix(generatedPrompt, "markdown")
+	generatedPrompt = strings.TrimSuffix(generatedPrompt, "```")
+
+	// Create Agent Struct
+	// Note: We do not save it to DB to keep it transient, or we could save it with a "dynamic" flag.
+	// For now, let's keep it in-memory.
+	agent := &model.Agent{
+		Name:         name,
+		Description:  "Dynamically generated expert for: " + intent,
+		Type:         consts.AgentTypeDynamic,
+		SystemPrompt: generatedPrompt,
+		ModelID:      modelConfig.ID,
+		// Assign default modes so it has tools
+		Modes: []model.Mode{
+			{Key: consts.BuildMode}, // Default to Build mode to allow tool usage
+		},
+	}
+
+	return agent, nil
+}
+
 func (s *ChatService) chatWithExternalAgent(ctx context.Context, session *model.Session, agent *model.Agent, userMessage string, modeKey string, project *model.Project, eventChan chan<- chat.ChatEvent) error {
 	userMsg := &model.Message{
 		SessionID: session.ID,
@@ -857,14 +916,16 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		einoTools = nil
 	}
 
+	slog.Info("开始调用模型", slog.String("模型", modelConfig.Name))
 	// 5. Init AI Client
 	aiClient, err := ai.NewAIClient(modelConfig, einoTools)
 	if err != nil {
+		slog.Error("初始化AI客户端失败", slog.String("模型", modelConfig.Name), slog.Any("错误", err))
 		return fmt.Errorf("failed to init ai client: %v", err)
 	}
 
 	// [New] Check if Orchestration is needed
-	if (effectiveMode == "plan" || effectiveMode == "build") && s.plannerFactory != nil {
+	if (effectiveMode == consts.PlanMode || effectiveMode == consts.BuildMode) && s.plannerFactory != nil {
 		planner := s.plannerFactory(aiClient)
 		tree, err := planner.Plan(ctx, userMessage)
 		if err == nil && tree != nil && len(tree.Tasks) > 0 {
@@ -913,12 +974,14 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		Content:   userMessage,
 	}
 	if err := s.messageRepo.Create(userMsg); err != nil {
+		slog.Error("保存用户消息失败", slog.Any("会话ID", sessionID), slog.Any("错误", err))
 		return fmt.Errorf("failed to save user message: %v", err)
 	}
 
 	// Load History (including the one just saved, but we need structure for AI client)
 	history, err := s.messageRepo.ListBySessionID(sessionID)
 	if err != nil {
+		slog.Error("加载会话消息失败", slog.Any("会话ID", sessionID), slog.Any("错误", err))
 		return fmt.Errorf("failed to load history: %v", err)
 	}
 
@@ -968,6 +1031,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 	for i := 0; i < maxTurns; i++ {
 		if ctx.Err() != nil {
+			slog.Error("上下文已取消", slog.Any("会话ID", sessionID), slog.Any("错误", ctx.Err()))
 			s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventTerminated}, eventChan)
 			return nil
 		}

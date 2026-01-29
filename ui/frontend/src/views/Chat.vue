@@ -130,11 +130,11 @@
           style="margin-bottom: 10px"
         />
         <BubbleList
-          :list="messages"
+          :list="displayMessages"
           :loading="isGenerating"
           class="messages-area"
           :bubble-props="{ showTime: true }"
-          :auto-scroll="messages.length >= 2"
+          :auto-scroll="displayMessages.length >= 2"
         >
           <template #avatar="{ item }">
             <n-avatar
@@ -273,6 +273,27 @@ const currentSessionId = computed({
 const currentChatMode = ref(ChatModes.Chat);
 const currentChatAgentId = ref(null);
 const messages = computed(() => chatStore.messages);
+const displayMessages = computed(() => {
+  if (!messages.value || !Array.isArray(messages.value)) return [];
+  return messages.value.filter((msg) => {
+    // Always show non-assistant messages
+    if (msg.role !== ChatRoles.Assistant) return true;
+
+    // Show if content is not empty
+    if (msg.content && msg.content.trim().length > 0) return true;
+
+    // Show if it has associated sub-agent tasks
+    const index = messages.value.indexOf(msg);
+    if (index !== -1) {
+      const hasTasks = Array.from(subAgentTaskMap.value.values()).some(
+        (t) => t.messageIndex === index && !t.parentTaskId,
+      );
+      if (hasTasks) return true;
+    }
+
+    return false;
+  });
+});
 const inputText = computed({
   get: () => chatStore.input,
   set: (val) => (chatStore.input = val),
@@ -425,6 +446,7 @@ async function handleDeleteSession(session) {
         if (currentSessionId.value === session.id) {
           currentSessionId.value = null;
           chatStore.messages = [];
+          subAgentTaskMap.value.clear();
         }
         await chatStore.fetchSessions(currentProjectId.value);
       } catch (e) {

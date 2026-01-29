@@ -4,6 +4,7 @@ const (
 	// Agent Types
 	AgentTypeBuiltin = "builtin"
 	AgentTypeCustom  = "custom"
+	AgentTypeDynamic = "dynamic"
 
 	// Agent Names
 	ChatMode  = "CHAT"
