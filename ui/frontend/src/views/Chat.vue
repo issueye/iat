@@ -136,7 +136,7 @@
       </div>
 
       <div class="chat-main-content">
-        <div class="chat-area" :class="{ 'with-sidebar': showTaskList }">
+        <div class="chat-area">
           <WorkflowCanvas
             v-if="currentWorkflowTasks.length > 0"
             :tasks="currentWorkflowTasks"
@@ -177,21 +177,25 @@
             </template>
           </BubbleList>
 
-          <div class="input-area">
-            <Sender
-              v-model="inputText"
-              :disabled="isGenerating"
-              :loading="isGenerating"
-              placeholder="输入消息... (Ctrl+Enter 发送)"
-              @submit="handleSend"
-              @cancel="handleStop"
+          <div class="input-container">
+            <!-- Task List Floating Panel -->
+            <TaskList
+              v-if="showTaskList && currentSessionId"
+              :session-id="currentSessionId"
+              class="floating-task-list"
             />
-          </div>
-        </div>
 
-        <!-- Task List Sidebar -->
-        <div v-if="showTaskList" class="task-sidebar">
-          <TaskList :session-id="currentSessionId" />
+            <div class="input-area">
+              <Sender
+                v-model="inputText"
+                :disabled="isGenerating"
+                :loading="isGenerating"
+                placeholder="输入消息... (Ctrl+Enter 发送)"
+                @submit="handleSend"
+                @cancel="handleStop"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -861,12 +865,18 @@ onMounted(() => {
   border-right: 1px solid #eee;
 }
 
-.task-sidebar {
-  width: 300px;
-  background-color: #fff;
-  border-left: 1px solid #eee;
+/* Floating Task List */
+.input-container {
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.floating-task-list {
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+  background-color: #fafafa;
+  max-height: 300px;
   transition: all 0.3s ease;
 }
 

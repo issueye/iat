@@ -1,7 +1,21 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
-import { NTag, NCheckbox, NButton, NIcon, NInput, NEmpty, NScrollbar, useMessage } from "naive-ui";
-import { TrashOutline, AddOutline, RefreshOutline as RefreshIcon } from "@vicons/ionicons5";
+import {
+  NTag,
+  NCheckbox,
+  NButton,
+  NIcon,
+  NInput,
+  NEmpty,
+  NScrollbar,
+  useMessage,
+} from "naive-ui";
+import {
+  TrashOutline,
+  AddOutline,
+  RefreshOutline as RefreshIcon,
+  ChevronDownOutline as ChevronDownIcon,
+} from "@vicons/ionicons5";
 import { api } from "../api";
 
 const props = defineProps({
@@ -25,9 +39,12 @@ async function fetchTasks() {
   }
 }
 
-watch(() => props.sessionId, () => {
-  fetchTasks();
-});
+watch(
+  () => props.sessionId,
+  () => {
+    fetchTasks();
+  },
+);
 
 onMounted(() => {
   fetchTasks();
@@ -36,7 +53,11 @@ onMounted(() => {
 async function handleAdd() {
   if (!newTaskContent.value.trim()) return;
   try {
-    const task = await api.createTask(props.sessionId, newTaskContent.value, "medium");
+    const task = await api.createTask(
+      props.sessionId,
+      newTaskContent.value,
+      "medium",
+    );
     tasks.value.push(task);
     newTaskContent.value = "";
     message.success("添加成功");
@@ -50,7 +71,7 @@ async function handleCheck(task, checked) {
   // Optimistic update
   const oldStatus = task.status;
   task.status = newStatus;
-  
+
   try {
     await api.updateTask(task.id, newStatus);
   } catch (e) {
@@ -62,7 +83,7 @@ async function handleCheck(task, checked) {
 async function handleDelete(id) {
   try {
     await api.deleteTask(id);
-    tasks.value = tasks.value.filter(t => t.id !== id);
+    tasks.value = tasks.value.filter((t) => t.id !== id);
     message.success("删除成功");
   } catch (e) {
     message.error("删除失败");
@@ -71,10 +92,14 @@ async function handleDelete(id) {
 
 function priorityType(p) {
   switch (p) {
-    case "high": return "error";
-    case "medium": return "warning";
-    case "low": return "info";
-    default: return "default";
+    case "high":
+      return "error";
+    case "medium":
+      return "warning";
+    case "low":
+      return "info";
+    default:
+      return "default";
   }
 }
 
@@ -86,88 +111,150 @@ const sortedTasks = computed(() => {
   });
 });
 
-const completedCount = computed(() => tasks.value.filter(t => t.status === 'completed').length);
+const completedCount = computed(
+  () => tasks.value.filter((t) => t.status === "completed").length,
+);
+const isCollapsed = ref(false);
 
 // Expose refresh method for parent
 defineExpose({ refresh: fetchTasks });
 </script>
 
 <template>
-  <div class="task-list-container">
-    <div class="header">
-      <div style="font-weight: bold;">任务列表</div>
-      <n-tag v-if="tasks.length > 0" size="small" round :bordered="false">
-        {{ completedCount }} / {{ tasks.length }}
-      </n-tag>
-      <n-button text size="tiny" @click="fetchTasks" :loading="loading">
-        <template #icon><n-icon><RefreshIcon /></n-icon></template>
-      </n-button>
-    </div>
-
-    <div class="add-box">
-      <n-input
-        v-model:value="newTaskContent"
-        placeholder="添加新任务..."
-        size="small"
-        @keyup.enter="handleAdd"
-      >
-        <template #suffix>
-          <n-button text size="tiny" @click="handleAdd">
-            <template #icon><n-icon><AddOutline /></n-icon></template>
-          </n-button>
-        </template>
-      </n-input>
-    </div>
-
-    <n-scrollbar style="flex: 1">
-      <div v-if="tasks.length === 0" class="empty-state">
-        <n-empty description="暂无任务" size="small" />
-      </div>
-      <div v-else class="list">
-        <div
-          v-for="task in sortedTasks"
-          :key="task.id"
-          class="task-item"
-          :class="{ completed: task.status === 'completed' }"
+  <div class="task-list-container" :class="{ collapsed: isCollapsed }">
+    <div class="header" @click="isCollapsed = !isCollapsed">
+      <div class="header-left">
+        <n-icon class="collapse-icon" :class="{ rotate: isCollapsed }">
+          <ChevronDownIcon />
+        </n-icon>
+        <div style="font-weight: bold">任务列表</div>
+        <n-tag
+          v-if="tasks.length > 0"
+          size="small"
+          round
+          :bordered="false"
+          class="count-tag"
         >
-          <n-checkbox
-            :checked="task.status === 'completed'"
-            @update:checked="(v) => handleCheck(task, v)"
-            style="margin-right: 8px"
-          />
-          <div class="content">
-            <div class="text">{{ task.content }}</div>
-            <div class="meta">
-              <n-tag size="tiny" :type="priorityType(task.priority)" :bordered="false" style="margin-right: 4px; padding: 0 4px; height: 16px; font-size: 10px;">
-                {{ task.priority }}
-              </n-tag>
-              <n-button size="tiny" text type="error" @click="handleDelete(task.id)" class="del-btn">
-                <template #icon><n-icon><TrashOutline /></n-icon></template>
-              </n-button>
+          {{ completedCount }} / {{ tasks.length }}
+        </n-tag>
+      </div>
+      <div class="header-right" @click.stop>
+        <n-button text size="tiny" @click="fetchTasks" :loading="loading">
+          <template #icon
+            ><n-icon><RefreshIcon /></n-icon
+          ></template>
+        </n-button>
+      </div>
+    </div>
+
+    <div class="task-body" v-show="!isCollapsed">
+      <div class="add-box">
+        <n-input
+          v-model:value="newTaskContent"
+          placeholder="添加新任务..."
+          size="small"
+          @keyup.enter="handleAdd"
+        >
+          <template #suffix>
+            <n-button text size="tiny" @click="handleAdd">
+              <template #icon
+                ><n-icon><AddOutline /></n-icon
+              ></template>
+            </n-button>
+          </template>
+        </n-input>
+      </div>
+
+      <n-scrollbar style="height: 200px">
+        <div v-if="tasks.length === 0" class="empty-state">
+          <n-empty description="暂无任务" size="small" />
+        </div>
+        <div v-else class="list">
+          <div
+            v-for="task in sortedTasks"
+            :key="task.id"
+            class="task-item"
+            :class="{ completed: task.status === 'completed' }"
+          >
+            <n-checkbox
+              :checked="task.status === 'completed'"
+              @update:checked="(v) => handleCheck(task, v)"
+              style="margin-right: 8px"
+            />
+            <div class="content">
+              <div class="text">{{ task.content }}</div>
+              <div class="meta">
+                <n-tag
+                  size="tiny"
+                  :type="priorityType(task.priority)"
+                  :bordered="false"
+                  style="
+                    margin-right: 4px;
+                    padding: 0 4px;
+                    height: 16px;
+                    font-size: 10px;
+                  "
+                >
+                  {{ task.priority }}
+                </n-tag>
+                <n-button
+                  size="tiny"
+                  text
+                  type="error"
+                  @click="handleDelete(task.id)"
+                  class="del-btn"
+                >
+                  <template #icon
+                    ><n-icon><TrashOutline /></n-icon
+                  ></template>
+                </n-button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </n-scrollbar>
+      </n-scrollbar>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* Same styles as before, kept for brevity */
 .task-list-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
   background-color: #fff;
-  /* Border handled by parent */
+  transition: all 0.3s ease;
 }
 
 .header {
-  padding: 12px;
+  padding: 8px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  background-color: #f5f5f5;
+  user-select: none;
+}
+
+.header:hover {
+  background-color: #eef;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collapse-icon {
+  transition: transform 0.3s;
+}
+
+.collapse-icon.rotate {
+  transform: rotate(-90deg);
+}
+
+.task-body {
+  border-top: 1px solid #f0f0f0;
 }
 
 .add-box {
@@ -182,7 +269,7 @@ defineExpose({ refresh: fetchTasks });
 .task-item {
   display: flex;
   align-items: flex-start;
-  padding: 8px 12px;
+  padding: 6px 12px;
   transition: background-color 0.2s;
 }
 
@@ -207,7 +294,7 @@ defineExpose({ refresh: fetchTasks });
 .text {
   font-size: 13px;
   line-height: 1.4;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   word-break: break-word;
 }
 
@@ -219,7 +306,8 @@ defineExpose({ refresh: fetchTasks });
 .meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: 8px;
 }
 
 .empty-state {
@@ -228,4 +316,3 @@ defineExpose({ refresh: fetchTasks });
   justify-content: center;
 }
 </style>
-

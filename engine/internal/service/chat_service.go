@@ -815,6 +815,8 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		}
 	}
 
+	slog.Info("当前会话", slog.Any("session", session.ID))
+
 	// 2. Get Agent
 	// If agentID is provided (e.g. from toolbar), use it.
 	// Otherwise, use the session's default agent.
@@ -822,6 +824,8 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 	if agentID > 0 {
 		targetAgentID = agentID
 	}
+
+	slog.Info("会话AGENT", slog.Any("AGENT ID", targetAgentID))
 
 	if targetAgentID == 0 {
 		return fmt.Errorf("session has no agent assigned and no agent selected")
@@ -845,6 +849,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 	}()
 
 	if agent.Type == "external" && agent.ExternalURL != "" {
+		slog.Info("外部AGENT", slog.String("URL", agent.ExternalURL))
 		return s.chatWithExternalAgent(ctx, session, agent, userMessage, modeKey, project, eventChan)
 	}
 
@@ -940,9 +945,10 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 	// [Fix] DeepSeek R1 (reasoner) does not support Tools yet.
 	// If the model is a reasoner model, we MUST NOT send tools, otherwise API returns 400.
+	// Update: DeepSeek R1 now supports tools in some environments, let's enable it but log warning
 	if modelConfig != nil && (strings.Contains(strings.ToLower(modelConfig.Name), "reasoner") || strings.Contains(strings.ToLower(modelConfig.Name), "deepseek-r1")) {
-		fmt.Printf("[ChatService] Detected Reasoner model '%s', disabling tools to prevent API error.\n", modelConfig.Name)
-		einoTools = nil
+		fmt.Printf("[ChatService] Detected Reasoner model '%s'. Tools are enabled (experimental).\n", modelConfig.Name)
+		// einoTools = nil // Re-enabled tools for R1
 	}
 
 	slog.Info("开始调用模型", slog.String("模型", modelConfig.Name))
@@ -1021,12 +1027,34 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 		},
 	}
 
+	// [New] Inject Pending Tasks
+	if s.taskService != nil {
+		tasks, err := s.taskService.ListTasks(sessionID)
+		if err == nil && len(tasks) > 0 {
+			var pendingTasks []string
+			for _, t := range tasks {
+				if t.Status != "completed" {
+					pendingTasks = append(pendingTasks, fmt.Sprintf("- [ID:%d] %s (Priority: %s)", t.ID, t.Content, t.Priority))
+				}
+			}
+			if len(pendingTasks) > 0 {
+				taskContext := fmt.Sprintf("\n\n# Current Pending Tasks\nThe following tasks are currently pending. Please check if your actions can complete any of them, or if you need to work on them according to priority:\n%s", strings.Join(pendingTasks, "\n"))
+				messages[0].Content += taskContext
+			}
+		}
+	}
+
 	for _, msg := range history {
 		role := schema.User
 		content := msg.Content
 		if msg.Role == consts.RoleAssistant {
 			role = schema.Assistant
 			content = stripThinkContent(content)
+		}
+
+		// 如果内容为空，跳过
+		if content == "" {
+			continue
 		}
 		messages = append(messages, &schema.Message{
 			Role:    role,
@@ -1073,7 +1101,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 			"messages": messages,
 			"tools":    einoTools,
 		}
-		promptJSON, _ := json.Marshal(promptData)
+		promptJSON, err := json.Marshal(promptData)
 		currentPrompt := string(promptJSON)
 
 		stream, err := aiClient.StreamChat(ctx, messages)
@@ -1094,6 +1122,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 				// EOF or Error
 				// Check if error is EOF, otherwise log it
 				// stream.Recv returns io.EOF when done
+				slog.Error("接收AI模型响应失败", slog.Any("失败原因", err.Error()))
 				break
 			}
 
@@ -1102,6 +1131,8 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 				fullResponse += chunk.Content
 				s.emitEvent(sessionID, chat.ChatEvent{Type: chat.ChatEventChunk, Content: chunk.Content}, eventChan)
 			}
+
+			slog.Info("AI 模型是否需要调用工具", slog.Any("isCall", len(chunk.ToolCalls) > 0))
 
 			// Handle Tool Calls (Accumulate)
 			for _, tc := range chunk.ToolCalls {
@@ -1188,6 +1219,7 @@ func (s *ChatService) Chat(ctx context.Context, sessionID uint, userMessage stri
 
 		// If no tool calls, we are done
 		if len(toolCalls) == 0 {
+			slog.Info("无工具调用，结束会话", slog.Any("会话ID", sessionID))
 			// Send done signal
 			eventChan <- chat.ChatEvent{
 				Type:  chat.ChatEventDone,
