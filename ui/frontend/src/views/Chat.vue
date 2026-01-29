@@ -455,7 +455,9 @@ async function handleSend(val) {
         currentChatAgentId.value,
       );
       await chatStore.fetchSessions(currentProjectId.value);
-      currentSessionId.value = sess.id;
+      // Directly set the store value to avoid triggering fetchMessages for a new session
+      chatStore.currentSessionId = sess.id;
+      chatStore.messages = [];
     } catch (e) {
       message.error("创建会话失败: " + e.message);
       return;
@@ -475,12 +477,13 @@ async function handleSend(val) {
   chatStore.addMessage(sendData);
 
   // Add Assistant Placeholder
-  const aiMsgIndex =
-    chatStore.addMessage({
-      role: ChatRoles.Assistant,
-      content: "",
-      createdAt: new Date().toISOString(),
-    }) - 1;
+  const aiMsg = {
+    role: ChatRoles.Assistant,
+    content: "",
+    createdAt: new Date().toISOString(),
+  };
+  chatStore.addMessage(aiMsg);
+  const aiMsgIndex = chatStore.messages.length - 1;
 
   // Use Fetch for stream instead of EventSource for POST
   try {
@@ -519,7 +522,7 @@ async function handleSend(val) {
           const dataStr = trimmedLine.slice(6);
           try {
             const data = JSON.parse(dataStr);
-            handleSSEEvent(data, aiMsgIndex);
+            handleSSEEvent(data, aiMsg, aiMsgIndex);
           } catch (e) {
             console.error("Error parsing SSE event", e);
           }
@@ -528,8 +531,8 @@ async function handleSend(val) {
     }
   } catch (e) {
     message.error("发送失败: " + e.message);
-    if (chatStore.messages[aiMsgIndex]) {
-      chatStore.messages[aiMsgIndex].content = "[Error: " + e.message + "]";
+    if (aiMsg) {
+      aiMsg.content = "[Error: " + e.message + "]";
     }
     generationStatus.value = ThinkingStatuses.Error;
   } finally {
@@ -538,8 +541,7 @@ async function handleSend(val) {
   }
 }
 
-function handleSSEEvent(data, aiMsgIndex) {
-  const msg = chatStore.messages[aiMsgIndex];
+function handleSSEEvent(data, msg, aiMsgIndex) {
   if (!msg) return;
 
   if (data.type === "chunk") {

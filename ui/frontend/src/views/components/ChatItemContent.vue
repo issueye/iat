@@ -7,20 +7,30 @@
     <pre class="tool-args">{{ item.toolArguments }}</pre>
   </div>
   <div v-else>
+    <template v-for="(segment, index) in parsedContent.segments" :key="index">
+      <Thinking
+        v-if="segment.type === 'think'"
+        :content="segment.content"
+        :loading="parsedContent.isThinkingOpen && index === parsedContent.segments.length - 1"
+        :default-collapsed="parsedContent.hasAnswer"
+      />
+      <XMarkdown
+        v-else-if="segment.type === 'text'"
+        :markdown="segment.content"
+        default-theme-mode="light"
+        style="text-align: left; margin-top: 8px"
+        :code-x-props="{ enableCodeLineNumber: true }"
+      />
+    </template>
+    
+    <!-- Loading state when thinking is open but no content in the last segment yet -->
     <Thinking
-      v-if="
-        parseThinkContent(item.content).think ||
-        parseThinkContent(item.content).isThinkingOpen
-      "
-      :content="parseThinkContent(item.content).think"
+      v-if="parsedContent.isThinkingOpen && (parsedContent.segments.length === 0 || parsedContent.segments[parsedContent.segments.length-1].type !== 'think')"
+      content=""
+      loading
+      :default-collapsed="parsedContent.hasAnswer"
     />
-    <XMarkdown
-      v-if="parseThinkContent(item.content).answer"
-      :markdown="parseThinkContent(item.content).answer"
-      default-theme-mode="light"
-      style="text-align: left; margin-top: 8px"
-      :code-x-props="{ enableCodeLineNumber: true }"
-    />
+
     <!-- Sub-Agent Tasks -->
     <div
       v-if="getTasksByMessage(item).length > 0"
@@ -36,10 +46,11 @@
   </div>
 </template>
 <script setup>
+import { computed } from "vue";
 import SubAgentCard from "@/components/SubAgentCard.vue";
 import Thinking from "@/components/Thinking.vue";
 import { ContractOutline } from "@vicons/ionicons5";
-import { ThinkTags } from "@/constants/chat";
+import { parseThinkContent } from "@/utils/think";
 import { api } from "@/api";
 import { useMessage } from "naive-ui";
 
@@ -59,54 +70,9 @@ const props = defineProps({
   },
 });
 
+const parsedContent = computed(() => parseThinkContent(props.item.content));
+
 // Helper Functions
-function parseThinkContent(text) {
-  const raw = String(text || "");
-  const thinkOpenTag = ThinkTags.Open;
-  const thinkCloseTag = ThinkTags.Close;
-  let i = 0;
-  let inThink = false;
-  let answer = "";
-  let think = "";
-
-  while (i < raw.length) {
-    const openAt = raw.indexOf(thinkOpenTag, i);
-    const closeAt = raw.indexOf(thinkCloseTag, i);
-
-    const nextAt =
-      openAt === -1
-        ? closeAt
-        : closeAt === -1
-          ? openAt
-          : Math.min(openAt, closeAt);
-
-    if (nextAt === -1) {
-      const chunk = raw.slice(i);
-      if (inThink) think += chunk;
-      else answer += chunk;
-      break;
-    }
-
-    const chunk = raw.slice(i, nextAt);
-    if (inThink) think += chunk;
-    else answer += chunk;
-
-    if (nextAt === openAt) {
-      inThink = true;
-      i = nextAt + thinkOpenTag.length;
-    } else {
-      inThink = false;
-      i = nextAt + thinkCloseTag.length;
-    }
-  }
-
-  return {
-    think: think.trim(),
-    answer: answer.trim(),
-    isThinkingOpen: inThink,
-  };
-}
-
 function getTasksByMessage(msg) {
   const idx = props.messages.indexOf(msg);
   if (idx === -1) return [];

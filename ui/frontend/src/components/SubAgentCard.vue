@@ -19,13 +19,8 @@ import {
   ChevronDownOutline,
 } from "@vicons/ionicons5";
 import Thinking from "./Thinking.vue";
-
 import XMarkdown from "./renderers/XMarkdown.vue";
-
-const ThinkTags = {
-  Open: "<think>",
-  Close: "</think>",
-};
+import { parseThinkContent } from "@/utils/think";
 
 const props = defineProps({
   taskId: String,
@@ -46,53 +41,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(["abort"]);
-
-function parseThinkContent(text) {
-  const raw = String(text || "");
-  const thinkOpenTag = ThinkTags.Open;
-  const thinkCloseTag = ThinkTags.Close;
-  let i = 0;
-  let inThink = false;
-  let answer = "";
-  let think = "";
-
-  while (i < raw.length) {
-    const openAt = raw.indexOf(thinkOpenTag, i);
-    const closeAt = raw.indexOf(thinkCloseTag, i);
-
-    const nextAt =
-      openAt === -1
-        ? closeAt
-        : closeAt === -1
-          ? openAt
-          : Math.min(openAt, closeAt);
-
-    if (nextAt === -1) {
-      const chunk = raw.slice(i);
-      if (inThink) think += chunk;
-      else answer += chunk;
-      break;
-    }
-
-    const chunk = raw.slice(i, nextAt);
-    if (inThink) think += chunk;
-    else answer += chunk;
-
-    if (nextAt === openAt) {
-      inThink = true;
-      i = nextAt + thinkOpenTag.length;
-    } else {
-      inThink = false;
-      i = nextAt + thinkCloseTag.length;
-    }
-  }
-
-  return {
-    think: think.trim(),
-    answer: answer.trim(),
-    isThinkingOpen: inThink,
-  };
-}
 
 const parsedStream = computed(() => {
   const chunks = props.chunks || [];
@@ -211,22 +159,44 @@ const handleAbort = () => {
             >
           </template>
           <div class="thought-content">
-            <Thinking
-              v-if="parsedStream.think || parsedStream.isThinkingOpen"
-              :content="parsedStream.think"
-            />
-            <div
-              v-if="parsedStream.answer"
-              class="stream-answer"
-              style="margin-top: 8px"
+            <template
+              v-for="(segment, index) in parsedStream.segments"
+              :key="index"
             >
-              <XMarkdown :markdown="parsedStream.answer" />
-            </div>
+              <Thinking
+                v-if="segment.type === 'think'"
+                :content="segment.content"
+                :loading="
+                  parsedStream.isThinkingOpen &&
+                  index === parsedStream.segments.length - 1
+                "
+                :default-collapsed="parsedStream.hasAnswer"
+              />
+              <div
+                v-else-if="segment.type === 'text'"
+                class="stream-answer"
+                style="margin-top: 8px"
+              >
+                <XMarkdown :markdown="segment.content" />
+              </div>
+            </template>
+
+            <Thinking
+              v-if="
+                parsedStream.isThinkingOpen &&
+                (parsedStream.segments.length === 0 ||
+                  parsedStream.segments[parsedStream.segments.length - 1]
+                    .type !== 'think')
+              "
+              content=""
+              loading
+              :default-collapsed="parsedStream.hasAnswer"
+            />
+
             <div
               v-if="
-                !parsedStream.think &&
-                !parsedStream.isThinkingOpen &&
-                !parsedStream.answer
+                parsedStream.segments.length === 0 &&
+                !parsedStream.isThinkingOpen
               "
               class="empty-text"
             >

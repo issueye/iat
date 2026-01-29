@@ -8,59 +8,79 @@
         />
         <span class="thinking-title">思考过程</span>
       </div>
-      <div v-if="!content && !collapsed" class="thinking-status">
+    <div v-if="!content && loading && !collapsed" class="thinking-status">
         <n-spin size="small" />
       </div>
     </div>
     <div v-show="!collapsed" class="thinking-content">
       <div v-if="content" class="thinking-text">{{ content }}</div>
-      <div v-else class="thinking-placeholder">正在梳理思路...</div>
+      <div v-else-if="loading" class="thinking-placeholder">正在梳理思路...</div>
+      <div v-else class="thinking-placeholder">无思考过程记录</div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { NIcon, NSpin } from "naive-ui";
 import { ChevronDownOutline, ChevronForwardOutline } from "@vicons/ionicons5";
 
-defineProps({
+const props = defineProps({
   content: {
     type: String,
     default: "",
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  defaultCollapsed: {
+    type: Boolean,
+    default: false,
+  }
 });
 
-const collapsed = ref(false);
+const collapsed = ref(props.defaultCollapsed);
+
+// Sync with parent control but allow internal toggle
+watch(() => props.defaultCollapsed, (newVal) => {
+  collapsed.value = newVal;
+});
 </script>
 
 <style scoped>
 .thinking-block {
-  margin: var(--base-gap-sm);
+  margin: var(--base-gap-sm) 0;
   border-radius: var(--base-radius);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid #e9ecef;
+  background-color: #f8f9fa;
+  overflow: hidden;
 }
 
 .thinking-block.is-collapsed {
-  opacity: 0.8;
+  border-color: #dee2e6;
+  background-color: #f1f3f5;
 }
 
 .thinking-header {
-  width: 120px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--base-padding-sm);
-  border-radius: var(--base-radius);
+  padding: 6px 12px;
   cursor: pointer;
   user-select: none;
-  transition: background-color 0.2s;
-  border: 1px solid var(--color-grey-light);
-  background-color: var(--color-grey-light);
+  transition: all 0.2s;
+  background-color: #f1f3f5;
+  border-bottom: 1px solid transparent;
+}
+
+.thinking-block.is-collapsed .thinking-header {
+  background-color: transparent;
 }
 
 .thinking-header:hover {
-  background-color: #f1f3f5;
+  background-color: #e9ecef;
 }
 
 .header-left {
@@ -71,15 +91,16 @@ const collapsed = ref(false);
 
 .toggle-icon {
   font-size: 14px;
-  color: #adb5bd;
+  color: #868e96;
   transition: transform 0.3s;
 }
 
 .thinking-title {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   color: #495057;
-  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .thinking-status {
@@ -88,21 +109,20 @@ const collapsed = ref(false);
 }
 
 .thinking-content {
-  padding: 0 16px 12px;
-  max-height: 400px;
+  padding: 12px;
+  max-height: 300px;
   overflow-y: auto;
-  border: 1px solid #e9ecef;
   background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
 }
 
 .thinking-text {
   white-space: pre-wrap;
   font-size: 13px;
-  color: #6c757d;
+  color: #495057;
   line-height: 1.6;
   font-family: "Fira Code", "JetBrains Mono", monospace;
-  padding-left: 12px;
-  margin-top: var(--base-gap);
+  padding-left: 4px;
 }
 
 .thinking-placeholder {
